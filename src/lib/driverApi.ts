@@ -360,13 +360,19 @@ export async function getInitialSession() {
   return data.session;
 }
 
+function driverLoginEmail(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.startsWith("55") ? digits : `55${digits}`;
+  return `${normalized}@driver.frotak.local`;
+}
+
 export async function signInDriver(phone: string, password: string): Promise<Session> {
   if (!hasSupabaseConfig()) {
     throw new Error("Supabase nao configurado para o app motorista.");
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    phone: phone.replace(/[^\d+]/g, ""),
+    email: driverLoginEmail(phone),
     password,
   });
 
