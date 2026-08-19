@@ -111,6 +111,13 @@ type ProductRow = {
   name: string;
 };
 
+type DriverProfileRow = {
+  id: string;
+  full_name?: string | null;
+  phone?: string | null;
+  must_change_password?: boolean | null;
+};
+
 export type DriverDocument = {
   id: string;
   kind: string;
@@ -121,6 +128,7 @@ export type DriverDocument = {
 
 export type DriverAppContext = {
   driver: DriverRow;
+  profile: DriverProfileRow | null;
   vehicle: VehicleRow | null;
   trailers: TrailerRow[];
   sender: PartyRow | null;
@@ -419,6 +427,15 @@ export async function registerDriverFuel(input: {
     p_odometer: input.odometer,
     p_notes: input.notes ?? null,
   });
+  if (error) throw error;
+  return data as DriverAppContext;
+}
+
+export async function completeDriverPasswordSetup(newPassword: string): Promise<DriverAppContext> {
+  const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
+  if (passwordError) throw passwordError;
+
+  const { data, error } = await supabase.rpc("driver_app_complete_password_setup");
   if (error) throw error;
   return data as DriverAppContext;
 }

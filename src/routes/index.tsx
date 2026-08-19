@@ -8,6 +8,7 @@ import { TripScreen } from "@/components/app/TripScreen";
 import { DocsScreen } from "@/components/app/DocsScreen";
 import { ProfileScreen } from "@/components/app/ProfileScreen";
 import { LoginScreen } from "@/components/app/LoginScreen";
+import { PasswordSetupScreen } from "@/components/app/PasswordSetupScreen";
 import { Sheet } from "@/components/app/Sheet";
 import { FuelSheet } from "@/components/app/FuelSheet";
 
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 import {
   advanceDriverStage,
+  completeDriverPasswordSetup,
   FALLBACK_STAGE,
   FALLBACK_TRIP,
   getInitialSession,
@@ -159,6 +161,22 @@ function App() {
             await signInDriver(phone, password);
             await refreshContext();
             setAuthenticated(true);
+            setTab("home");
+          }}
+        />
+        <Toaster position="top-center" theme={theme} richColors />
+      </main>
+    );
+  }
+
+  if (context?.profile?.must_change_password) {
+    return (
+      <main className="mx-auto flex h-dvh max-w-[520px] flex-col overflow-hidden bg-background">
+        <PasswordSetupScreen
+          driverName={context.driver.name}
+          onComplete={async (password) => {
+            const next = await completeDriverPasswordSetup(password);
+            setContext(next);
             setTab("home");
           }}
         />
