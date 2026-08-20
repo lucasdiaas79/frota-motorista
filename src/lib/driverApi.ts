@@ -104,6 +104,11 @@ type PartyRow = {
   name: string;
   city?: string | null;
   state?: string | null;
+  address?: string | null;
+  location_label?: string | null;
+  location_source?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 };
 
 type ProductRow = {
@@ -176,6 +181,11 @@ export const DRIVER_STAGE_COUNT = 7;
 
 function place(row: PartyRow | null | undefined) {
   if (!row) return "-";
+  if (row.location_label) return row.location_label;
+  if (row.address) {
+    const cityState = [row.city, row.state].filter(Boolean).join("/");
+    return cityState ? `${row.address} - ${cityState}` : row.address;
+  }
   const location = [row.city, row.state].filter(Boolean).join("/");
   return location ? `${row.name} - ${location}` : row.name;
 }
