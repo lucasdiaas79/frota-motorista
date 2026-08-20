@@ -15,12 +15,14 @@ import { ProgressBar } from "./Stepper";
 import { DRIVER_STAGE_COUNT, type DriverAppStage, type DriverTrip } from "@/lib/driverApi";
 
 export function HomeScreen({
+  driverName,
   stage,
   trip,
   onOpenTrip,
   onAssistant,
   onFuel,
 }: {
+  driverName: string;
   stage: DriverAppStage;
   trip: DriverTrip;
   onOpenTrip: () => void;
@@ -28,7 +30,9 @@ export function HomeScreen({
   onFuel: () => void;
 }) {
   const progress = stage.index / (DRIVER_STAGE_COUNT - 1);
-  const idle = stage.id === "concluida";
+  const hasFreight = Boolean(trip.freightId);
+  const idle = !hasFreight;
+  const destinationParts = hasFreight ? stage.place.split(" - ") : ["-"];
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden px-4 pt-3 pb-3">
@@ -38,7 +42,7 @@ export function HomeScreen({
         </div>
         <div className="min-w-0">
           <p className="label-xs">Boa noite</p>
-          <h1 className="truncate text-[23px] leading-tight font-extrabold">Euclesio Oliveira</h1>
+          <h1 className="truncate text-[23px] leading-tight font-extrabold">{driverName || "-"}</h1>
         </div>
         <button className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2">
           <Bell className="h-5 w-5" />
@@ -94,20 +98,24 @@ export function HomeScreen({
           <Tile
             icon={<Truck className="h-4.5 w-4.5" />}
             label="Veiculo"
-            value={trip.plate}
-            sub={trip.trailer}
+            value={hasFreight ? trip.plate : "-"}
+            sub={hasFreight ? trip.trailer : "-"}
           />
           <Tile
             icon={<Clock className="h-4.5 w-4.5" />}
             label="Tempo restante"
-            value="3h 42"
-            sub={trip.distance}
+            value={hasFreight ? "-" : "0h 00"}
+            sub={hasFreight ? trip.distance : "-"}
           />
           <Tile
             icon={<MapPin className="h-4.5 w-4.5" />}
             label="Proximo destino"
-            value={stage.place.split(" - ")[0] || "-"}
-            sub={stage.place.includes(" - ") ? stage.place.split(" - ").slice(1).join(" - ") : "-"}
+            value={destinationParts[0] || "-"}
+            sub={
+              hasFreight && stage.place.includes(" - ")
+                ? destinationParts.slice(1).join(" - ")
+                : "-"
+            }
           />
           <Tile
             icon={<FileWarning className="h-4.5 w-4.5" />}

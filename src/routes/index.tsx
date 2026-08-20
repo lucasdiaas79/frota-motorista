@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { Home, Route as RouteIcon, FileText, User, Sparkles } from "lucide-react";
@@ -81,12 +81,12 @@ function App() {
   const stage = useMemo(() => stageFromContext(context), [context]);
   const trip = useMemo(() => tripFromContext(context), [context]);
 
-  const refreshContext = async () => {
+  const refreshContext = useCallback(async () => {
     const next = await loadDriverContext();
     setContext(next);
     setLoadError(null);
     return next;
-  };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -111,19 +111,39 @@ function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refreshContext]);
 
   useEffect(() => {
     if (!authenticated) return;
 
+    let refreshing = false;
+    const refreshSafely = () => {
+      if (refreshing) return;
+      refreshing = true;
+      void refreshContext()
+        .catch((error) => {
+          setLoadError(error instanceof Error ? error.message : "Nao foi possivel atualizar dados");
+        })
+        .finally(() => {
+          refreshing = false;
+        });
+    };
+
     const unsubscribe = subscribeDriverOperationalChanges(() => {
-      void refreshContext().catch((error) => {
-        setLoadError(error instanceof Error ? error.message : "Nao foi possivel atualizar dados");
-      });
+      refreshSafely();
     });
 
-    return unsubscribe;
-  }, [authenticated]);
+    const interval = window.setInterval(refreshSafely, 10000);
+    window.addEventListener("focus", refreshSafely);
+    document.addEventListener("visibilitychange", refreshSafely);
+
+    return () => {
+      unsubscribe();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshSafely);
+      document.removeEventListener("visibilitychange", refreshSafely);
+    };
+  }, [authenticated, refreshContext]);
 
   const advance = async () => {
     if (!trip.vehicleId || !stage.canDriverAdvance) {
@@ -199,6 +219,7 @@ function App() {
           >
             {tab === "home" && (
               <HomeScreen
+                driverName={context?.driver.name ?? "-"}
                 stage={stage}
                 trip={trip}
                 onOpenTrip={() => setTab("trip")}
