@@ -366,6 +366,10 @@ function driverLoginEmail(phone: string) {
   return `${normalized}@driver.frotak.local`;
 }
 
+function driverAuthPassword(password: string) {
+  return password === "1234" ? "Frotak1234!" : password;
+}
+
 export async function signInDriver(phone: string, password: string): Promise<Session> {
   if (!hasSupabaseConfig()) {
     throw new Error("Supabase nao configurado para o app motorista.");
@@ -373,7 +377,7 @@ export async function signInDriver(phone: string, password: string): Promise<Ses
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: driverLoginEmail(phone),
-    password,
+    password: driverAuthPassword(password),
   });
 
   if (error) throw error;
