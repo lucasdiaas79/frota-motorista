@@ -11,6 +11,7 @@ import { LoginScreen } from "@/components/app/LoginScreen";
 import { PasswordSetupScreen } from "@/components/app/PasswordSetupScreen";
 import { Sheet } from "@/components/app/Sheet";
 import { FuelSheet } from "@/components/app/FuelSheet";
+import { ExpenseSheet } from "@/components/app/ExpenseSheet";
 
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -22,6 +23,7 @@ import {
   getInitialSession,
   loadDriverContext,
   registerDriverDocument,
+  registerDriverExpense,
   registerDriverFuel,
   signInDriver,
   signOutDriver,
@@ -75,6 +77,7 @@ function App() {
   const [booting, setBooting] = useState(true);
   const [tab, setTab] = useState<Tab>("home");
   const [fuelOpen, setFuelOpen] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [context, setContext] = useState<DriverAppContext | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -224,7 +227,7 @@ function App() {
                 trip={trip}
                 onOpenTrip={() => setTab("trip")}
                 onAssistant={() => setAiOpen(true)}
-                onFuel={() => setFuelOpen(true)}
+                onFuel={() => setExpenseOpen(true)}
               />
             )}
             {tab === "trip" && (
@@ -236,7 +239,7 @@ function App() {
                   const next = await registerDriverDocument({ kind, fileName });
                   setContext(next);
                 }}
-                onFuel={() => setFuelOpen(true)}
+                onFuel={() => setExpenseOpen(true)}
                 onAssistant={() => setAiOpen(true)}
               />
             )}
@@ -269,6 +272,19 @@ function App() {
           onClose={() => setFuelOpen(false)}
           onSave={async (input) => {
             const next = await registerDriverFuel(input);
+            setContext(next);
+          }}
+        />
+
+        <ExpenseSheet
+          open={expenseOpen}
+          onClose={() => setExpenseOpen(false)}
+          onFuel={() => {
+            setExpenseOpen(false);
+            setFuelOpen(true);
+          }}
+          onSave={async (input) => {
+            const next = await registerDriverExpense(input);
             setContext(next);
           }}
         />

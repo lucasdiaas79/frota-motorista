@@ -144,7 +144,7 @@ export function HomeScreen({
       <div className="grid shrink-0 grid-cols-2 gap-2.5">
         <QuickAction
           icon={<Fuel className="h-4.5 w-4.5" />}
-          label="Abastecimento"
+          label="Registrar despesa"
           onClick={onFuel}
         />
         <QuickAction

@@ -451,6 +451,22 @@ export async function registerDriverFuel(input: {
   return data as DriverAppContext;
 }
 
+export async function registerDriverExpense(input: {
+  category: "pedagio" | "alimentacao" | "estacionamento" | "manutencao" | "outros";
+  description: string;
+  amount: number;
+  notes?: string;
+}): Promise<DriverAppContext> {
+  const { data, error } = await supabase.rpc("driver_app_register_expense", {
+    p_category: input.category,
+    p_description: input.description,
+    p_amount: input.amount,
+    p_notes: input.notes ?? null,
+  });
+  if (error) throw error;
+  return data as DriverAppContext;
+}
+
 export async function completeDriverPasswordSetup(newPassword: string): Promise<DriverAppContext> {
   const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
   if (passwordError) throw passwordError;
@@ -466,6 +482,7 @@ export function subscribeDriverOperationalChanges(onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "vehicles" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_documents" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "fuel_records" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "freight_expenses" }, onChange)
     .subscribe();
 
   return () => {
