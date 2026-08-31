@@ -34,6 +34,7 @@ export type DriverAppStageId =
   | "documentos"
   | "destinatario"
   | "descarga"
+  | "retorno"
   | "concluida";
 
 export type DriverAppStage = {
@@ -174,6 +175,7 @@ const STAGE_INDEX: Record<DriverAppStageId, number> = {
   documentos: 3,
   destinatario: 4,
   descarga: 5,
+  retorno: 6,
   concluida: 6,
 };
 
@@ -347,6 +349,21 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
       action: "Confirmar descarga concluida",
       place: recipient,
       eta: "Descarregando",
+      canDriverAdvance: true,
+    };
+  }
+
+  if (stage === "ENTREGA_FINALIZADA" && vehicle.status === "rota-retornando") {
+    return {
+      id: "retorno",
+      index: STAGE_INDEX.retorno,
+      short: "Retorno",
+      title: "Retorno ao patio",
+      subtitle: "Confirme sua chegada ao patio para liberar o veiculo.",
+      statusLabel: "Retornando",
+      action: "Cheguei no patio",
+      place: currentPlace || "Patio",
+      eta: "-",
       canDriverAdvance: true,
     };
   }

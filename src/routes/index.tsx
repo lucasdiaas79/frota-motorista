@@ -234,6 +234,7 @@ function App() {
               <TripScreen
                 stage={stage}
                 trip={trip}
+                documents={context?.documents ?? []}
                 onAdvance={() => void advance()}
                 onDocument={async (kind, fileName) => {
                   const next = await registerDriverDocument({ kind, fileName });

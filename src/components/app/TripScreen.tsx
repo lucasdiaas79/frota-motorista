@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Camera,
@@ -20,12 +20,18 @@ import { toast } from "sonner";
 import { Timeline } from "./Stepper";
 import { Sheet } from "./Sheet";
 import { ActionButton, Chip, Row, SectionTitle } from "./primitives";
-import { DRIVER_STAGE_COUNT, type DriverAppStage, type DriverTrip } from "@/lib/driverApi";
+import {
+  DRIVER_STAGE_COUNT,
+  type DriverAppStage,
+  type DriverDocument,
+  type DriverTrip,
+} from "@/lib/driverApi";
 import { cn } from "@/lib/utils";
 
 export function TripScreen({
   stage,
   trip,
+  documents,
   onAdvance,
   onDocument,
   onFuel,
@@ -33,6 +39,7 @@ export function TripScreen({
 }: {
   stage: DriverAppStage;
   trip: DriverTrip;
+  documents: DriverDocument[];
   onAdvance: () => void;
   onDocument: (kind: string, fileName: string) => Promise<void>;
   onFuel: () => void;
@@ -41,15 +48,29 @@ export function TripScreen({
   const [info, setInfo] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [noteSent, setNoteSent] = useState(false);
-  const [cteReady, setCteReady] = useState(false);
   const [receipt, setReceipt] = useState(false);
+  const cteDocument = useMemo(
+    () =>
+      documents.find(
+        (document) =>
+          (document.kind === "cte" || document.kind === "cte_mdfe") &&
+          !["rejeitado", "rejected", "deleted", "excluido"].includes(document.status),
+      ),
+    [documents],
+  );
+  const hasCteDocument = Boolean(cteDocument);
+
+  useEffect(() => {
+    if (stage.id !== "carregamento") setNoteSent(false);
+    if (stage.id !== "descarga") setReceipt(false);
+  }, [stage.id]);
 
   const canAdvance = !stage.canDriverAdvance
     ? false
     : stage.id === "carregamento"
       ? noteSent
       : stage.id === "documentos"
-        ? cteReady
+        ? hasCteDocument
         : stage.id === "descarga"
           ? receipt
           : true;
@@ -145,18 +166,8 @@ export function TripScreen({
 
             {stage.id === "documentos" && (
               <div className="mt-2 rounded-3xl border border-border bg-surface-2/40 p-4">
-                {!cteReady ? (
-                  <button
-                    onClick={() => {
-                      if (!stage.canDriverAdvance) {
-                        toast("Aguardando a central liberar os documentos");
-                        return;
-                      }
-                      setCteReady(true);
-                      toast.success("CT-e e MDF-e recebidos");
-                    }}
-                    className="flex w-full flex-col items-center gap-2 py-2 text-center"
-                  >
+                {!hasCteDocument ? (
+                  <div className="flex w-full flex-col items-center gap-2 py-2 text-center">
                     <span className="relative grid h-12 w-12 place-items-center">
                       <span className="absolute inset-0 rounded-full bg-primary/15 [animation:pulse-ring_1.8s_ease-out_infinite]" />
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -169,7 +180,7 @@ export function TripScreen({
                         A expedicao esta processando os documentos
                       </span>
                     </span>
-                  </button>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -177,22 +188,24 @@ export function TripScreen({
                         <FileText className="h-5 w-5" />
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-[14px] font-bold">CT-e 8891-2 - MDF-e 4410</p>
-                        <p className="text-xs text-muted-foreground">Emitidos agora ha pouco</p>
+                        <p className="truncate text-[14px] font-bold">{cteDocument?.file_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Documento enviado pela expedicao
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <ActionButton
                         tone="outline"
                         icon={<Eye className="h-4 w-4" />}
-                        onClick={() => toast("Abrindo documento...")}
+                        onClick={() => toast("Documento disponivel na aba Docs")}
                       >
                         Visualizar
                       </ActionButton>
                       <ActionButton
                         tone="outline"
                         icon={<Download className="h-4 w-4" />}
-                        onClick={() => toast.success("Download concluido")}
+                        onClick={() => toast("Download disponivel na aba Docs")}
                       >
                         Baixar
                       </ActionButton>
@@ -224,10 +237,11 @@ export function TripScreen({
             {(stage.id === "demanda" ||
               stage.id === "remetente" ||
               stage.id === "destinatario" ||
+              stage.id === "retorno" ||
               stage.id === "concluida") && (
               <div className="mt-2 rounded-3xl bg-gradient-to-b from-surface-2/60 to-transparent p-4 text-center">
                 <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/12 text-primary">
-                  {stage.id === "concluida" ? (
+                  {stage.id === "concluida" || stage.id === "retorno" ? (
                     <CheckCircle2 className="h-6 w-6" />
                   ) : (
                     <MapPin className="h-6 w-6" />
