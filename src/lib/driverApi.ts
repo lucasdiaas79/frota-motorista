@@ -450,22 +450,106 @@ export async function registerDriverDocument(input: {
 
 export async function registerDriverFuel(input: {
   station: string;
-  fuelType: "diesel_s10" | "arla";
-  liters: number;
-  amount: number;
+  tenantId?: string;
+  diesel?: {
+    liters: number;
+    amount: number;
+  };
+  arla?: {
+    liters: number;
+    amount: number;
+  };
   odometer: number;
   notes?: string;
+  paymentMethod?: string;
+  pumpPhoto?: File;
+  receiptPhoto?: File;
 }): Promise<DriverAppContext> {
-  const { data, error } = await supabase.rpc("driver_app_register_fuel", {
-    p_station: input.station,
-    p_fuel_type: input.fuelType,
-    p_liters: input.liters,
-    p_amount: input.amount,
-    p_odometer: input.odometer,
-    p_notes: input.notes ?? null,
+  const tenantId = input.tenantId;
+  if (!tenantId) {
+    throw new Error("Nao foi possivel identificar o tenant do motorista.");
+  }
+
+  const uploadedPaths: string[] = [];
+  try {
+    const pumpPhoto = await uploadFuelPhoto(tenantId, "pump_photo", input.pumpPhoto, uploadedPaths);
+    const receiptPhoto = await uploadFuelPhoto(tenantId, "receipt_photo", input.receiptPhoto, uploadedPaths);
+
+    const { data, error } = await supabase.rpc("driver_app_register_fuel_document", {
+      p_station: input.station,
+      p_odometer: input.odometer,
+      p_diesel_liters: input.diesel?.liters ?? null,
+      p_diesel_amount: input.diesel?.amount ?? null,
+      p_arla_liters: input.arla?.liters ?? null,
+      p_arla_amount: input.arla?.amount ?? null,
+      p_notes: input.notes ?? null,
+      p_payment_method: input.paymentMethod ?? null,
+      p_pump_photo_id: pumpPhoto?.id ?? null,
+      p_pump_photo_file_name: pumpPhoto?.fileName ?? null,
+      p_pump_photo_storage_bucket: pumpPhoto?.bucket ?? null,
+      p_pump_photo_storage_path: pumpPhoto?.path ?? null,
+      p_pump_photo_mime_type: pumpPhoto?.mimeType ?? null,
+      p_pump_photo_size_bytes: pumpPhoto?.sizeBytes ?? null,
+      p_receipt_photo_id: receiptPhoto?.id ?? null,
+      p_receipt_photo_file_name: receiptPhoto?.fileName ?? null,
+      p_receipt_photo_storage_bucket: receiptPhoto?.bucket ?? null,
+      p_receipt_photo_storage_path: receiptPhoto?.path ?? null,
+      p_receipt_photo_mime_type: receiptPhoto?.mimeType ?? null,
+      p_receipt_photo_size_bytes: receiptPhoto?.sizeBytes ?? null,
+    });
+    if (error) throw error;
+    return data as DriverAppContext;
+  } catch (error) {
+    if (uploadedPaths.length) {
+      void supabase.storage.from(FUEL_DOCUMENTS_BUCKET).remove(uploadedPaths);
+    }
+    throw error;
+  }
+}
+
+const FUEL_DOCUMENTS_BUCKET = "driver-fuel-documents";
+
+type UploadedFuelPhoto = {
+  id: string;
+  bucket: string;
+  path: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number;
+};
+
+function sanitizeStorageName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "foto.jpg";
+}
+
+async function uploadFuelPhoto(
+  tenantId: string,
+  kind: "pump_photo" | "receipt_photo",
+  file: File | undefined,
+  uploadedPaths: string[],
+): Promise<UploadedFuelPhoto | undefined> {
+  if (!file) return undefined;
+
+  const id = crypto.randomUUID();
+  const safeName = sanitizeStorageName(file.name);
+  const path = `${tenantId}/driver-app/fuel/${id}/${kind}-${Date.now()}-${safeName}`;
+
+  const { error } = await supabase.storage.from(FUEL_DOCUMENTS_BUCKET).upload(path, file, {
+    contentType: file.type || "application/octet-stream",
+    upsert: false,
   });
+
   if (error) throw error;
-  return data as DriverAppContext;
+  uploadedPaths.push(path);
+
+  return {
+    id,
+    bucket: FUEL_DOCUMENTS_BUCKET,
+    path,
+    fileName: file.name,
+    mimeType: file.type || null,
+    sizeBytes: file.size,
+  };
 }
 
 export async function registerDriverExpense(input: {

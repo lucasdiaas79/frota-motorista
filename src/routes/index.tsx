@@ -272,7 +272,10 @@ function App() {
           open={fuelOpen}
           onClose={() => setFuelOpen(false)}
           onSave={async (input) => {
-            const next = await registerDriverFuel(input);
+            const next = await registerDriverFuel({
+              ...input,
+              tenantId: context?.driver.tenant_id,
+            });
             setContext(next);
           }}
         />
