@@ -1,13 +1,15 @@
 import { motion } from "motion/react";
-import { Download, FileText, Loader2, Upload } from "lucide-react";
+import { Download, FileText, Loader2, MapPin, Truck, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { SectionTitle } from "./primitives";
-import type { DriverDocument } from "@/lib/driverApi";
+import { Row, SectionTitle } from "./primitives";
+import type { DriverDocument, DriverTrip } from "@/lib/driverApi";
 
 export function DocsScreen({
+  trip,
   documents,
   onDocument,
 }: {
+  trip: DriverTrip;
   documents: DriverDocument[];
   onDocument: (kind: string, fileName: string) => Promise<void>;
 }) {
@@ -20,11 +22,42 @@ export function DocsScreen({
     : [{ name: "Nenhum documento anexado", meta: "Aguardando envio", state: "pending" as const }];
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden px-4 pt-4 pb-3">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pt-4 pb-6">
       <h1 className="shrink-0 text-[24px] leading-tight font-extrabold">Documentos</h1>
       <p className="mt-1 shrink-0 text-[14px] text-muted-foreground">
         Tudo da viagem atual em um so lugar.
       </p>
+
+      <section className="mt-4 shrink-0 rounded-3xl border border-border bg-surface-2/40 p-3.5">
+        <SectionTitle>Informacoes do frete</SectionTitle>
+        <div className="mt-2 grid gap-2">
+          <div className="flex items-start gap-3 rounded-2xl bg-background/55 p-3">
+            <MapPin className="mt-0.5 h-4.5 w-4.5 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="label-xs">Rota</p>
+              <p className="truncate text-[13px] font-bold">{trip.shipper}</p>
+              <p className="truncate text-[13px] font-bold text-muted-foreground">
+                {trip.receiver}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl bg-background/55 p-3">
+            <Truck className="h-4.5 w-4.5 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-bold">
+                {trip.plate} · {trip.cargo}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{trip.trailer}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 divide-y divide-border/80">
+          <Row label="Codigo" value={trip.code} />
+          <Row label="Motorista" value={trip.driver} />
+          <Row label="Valor do frete" value={trip.freight} />
+          <Row label="Distancia" value={trip.distance} />
+        </div>
+      </section>
 
       <motion.button
         whileTap={{ scale: 0.98 }}

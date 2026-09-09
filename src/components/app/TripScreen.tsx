@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Camera,
-  ChevronDown,
-  Download,
-  Eye,
   FileText,
   Fuel,
   History,
   Loader2,
   MapPin,
-  Phone,
   CheckCircle2,
   Truck,
   Upload,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Timeline } from "./Stepper";
 import { Sheet } from "./Sheet";
-import { ActionButton, Chip, Row, SectionTitle } from "./primitives";
+import { ActionButton, Chip, SectionTitle } from "./primitives";
 import {
   DRIVER_STAGE_COUNT,
   type DriverAppStage,
@@ -35,26 +30,38 @@ export function TripScreen({
   onAdvance,
   onDocument,
   onFuel,
-  onAssistant,
 }: {
   stage: DriverAppStage;
   trip: DriverTrip;
   documents: DriverDocument[];
-  onAdvance: () => void;
-  onDocument: (kind: string, fileName: string) => Promise<void>;
+  onAdvance: (unloadedTons?: number) => void;
+  onDocument: (kind: string, fileName: string, file?: File) => Promise<void>;
   onFuel: () => void;
-  onAssistant: () => void;
 }) {
-  const [info, setInfo] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [noteSent, setNoteSent] = useState(false);
   const [receipt, setReceipt] = useState(false);
+  const [sendingNote, setSendingNote] = useState(false);
+  const [unloadedTons, setUnloadedTons] = useState("");
+  const noteInputRef = useRef<HTMLInputElement | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement | null>(null);
+  const rejectedNote = useMemo(
+    () =>
+      documents.find(
+        (document) =>
+          document.kind === "nota_fiscal" &&
+          ["rejeitado", "rejected"].includes(String(document.status ?? "").toLowerCase()),
+      ),
+    [documents],
+  );
   const cteDocument = useMemo(
     () =>
       documents.find(
         (document) =>
           (document.kind === "cte" || document.kind === "cte_mdfe") &&
-          !["rejeitado", "rejected", "deleted", "excluido"].includes(document.status),
+          !["rejeitado", "rejected", "deleted", "excluido"].includes(
+            String(document.status ?? "").toLowerCase(),
+          ),
       ),
     [documents],
   );
@@ -62,8 +69,14 @@ export function TripScreen({
 
   useEffect(() => {
     if (stage.id !== "carregamento") setNoteSent(false);
-    if (stage.id !== "descarga") setReceipt(false);
+    if (stage.id !== "descarga") {
+      setReceipt(false);
+      setUnloadedTons("");
+    }
   }, [stage.id]);
+
+  const parsedUnloadedTons = Number(unloadedTons.replace(/\./g, "").replace(",", "."));
+  const hasUnloadedTons = Number.isFinite(parsedUnloadedTons) && parsedUnloadedTons > 0;
 
   const canAdvance = !stage.canDriverAdvance
     ? false
@@ -72,52 +85,45 @@ export function TripScreen({
       : stage.id === "documentos"
         ? hasCteDocument
         : stage.id === "descarga"
-          ? receipt
+          ? receipt && hasUnloadedTons
           : true;
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-3 pb-[128px]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-[154px]">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <Chip pulse tone={stage.id === "concluida" ? "muted" : "primary"}>
               {stage.statusLabel}
             </Chip>
-            <h1 className="mt-2 text-[24px] leading-[1.08] font-extrabold tracking-tight">
+            <h1 className="mt-1.5 text-[22px] leading-[1.05] font-extrabold tracking-tight">
               {stage.title}
             </h1>
-            <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted-foreground">
+            <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-muted-foreground">
               {stage.subtitle}
             </p>
           </div>
-          <button
-            onClick={onAssistant}
-            aria-label="Assistente FrotaK"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-primary text-primary-foreground shadow-[var(--shadow-glow)]"
-          >
-            <Sparkles className="h-5 w-5" />
-          </button>
         </div>
 
-        <div className="mt-3 shrink-0 rounded-3xl bg-surface-2/50 p-3.5">
+        <div className="mt-2.5 shrink-0 rounded-3xl bg-surface-2/50 p-3">
           <div className="flex items-start gap-3">
             <div className="mt-1 flex flex-col items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-              <span className="h-5 w-px bg-border" />
-              <span className="h-2.5 w-2.5 rounded-full border-2 border-muted-foreground" />
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              <span className="h-4 w-px bg-border" />
+              <span className="h-2 w-2 rounded-full border-2 border-muted-foreground" />
             </div>
-            <div className="min-w-0 flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-1.5">
               <div>
                 <p className="label-xs">Origem</p>
-                <p className="truncate text-[14px] font-bold">{trip.shipper}</p>
+                <p className="truncate text-[13px] font-bold">{trip.shipper}</p>
               </div>
               <div>
                 <p className="label-xs">Destino</p>
-                <p className="truncate text-[14px] font-bold">{trip.receiver}</p>
+                <p className="truncate text-[13px] font-bold">{trip.receiver}</p>
               </div>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-[13px] font-semibold">
+          <div className="mt-2.5 flex items-center gap-2 border-t border-border pt-2.5 text-[12.5px] font-semibold">
             <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="truncate">{trip.cargo}</span>
             <span className="ml-auto rounded-lg bg-background px-2.5 py-1 font-mono text-[12px] tracking-wider">
@@ -133,27 +139,76 @@ export function TripScreen({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-3 min-h-0 shrink"
+            className="mt-2.5"
           >
             <p className="label-xs">Agora</p>
 
             {stage.id === "carregamento" && stage.canDriverAdvance && (
-              <UploadArea
-                done={noteSent}
-                title="Anexar foto da nota fiscal"
-                doneTitle="Nota fiscal anexada"
-                hint="Toque para abrir a camera"
-                doneHint="NF enviada para a central"
-                onClick={async () => {
-                  try {
-                    await onDocument("nota_fiscal", "nota-fiscal.jpg");
-                    setNoteSent(true);
-                    toast.success("Nota fiscal anexada");
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Nao foi possivel anexar");
-                  }
-                }}
-              />
+              <div className="space-y-2.5">
+                {rejectedNote && (
+                  <div className="rounded-3xl border border-destructive/30 bg-destructive/10 p-3.5 text-left">
+                    <p className="text-[14px] font-extrabold text-destructive">Nota reprovada</p>
+                    <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+                      A expedicao nao conseguiu validar a nota enviada. Envie uma nova foto ou
+                      informe que a nota foi enviada por email.
+                    </p>
+                  </div>
+                )}
+                <input
+                  ref={noteInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  capture="environment"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    event.currentTarget.value = "";
+                    if (!file) return;
+                    setSendingNote(true);
+                    try {
+                      await onDocument("nota_fiscal", file.name || "nota-fiscal.jpg", file);
+                      setNoteSent(true);
+                      toast.success("Nota enviada para a expedicao");
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error ? error.message : "Nao foi possivel enviar a nota",
+                      );
+                    } finally {
+                      setSendingNote(false);
+                    }
+                  }}
+                />
+                <UploadArea
+                  done={noteSent}
+                  loading={sendingNote}
+                  title="Fotografar nota fiscal"
+                  doneTitle="Nota enviada"
+                  hint="Abra a camera e envie para a expedicao"
+                  doneHint="Aguardando CT-e/MDF-e"
+                  onClick={() => noteInputRef.current?.click()}
+                />
+                <ActionButton
+                  tone="outline"
+                  icon={sendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  disabled={sendingNote}
+                  onClick={async () => {
+                    setSendingNote(true);
+                    try {
+                      await onDocument("nota_fiscal", "nota-enviada-por-email.txt");
+                      setNoteSent(true);
+                      toast.success("Nota marcada como enviada por email");
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error ? error.message : "Nao foi possivel informar o envio",
+                      );
+                    } finally {
+                      setSendingNote(false);
+                    }
+                  }}
+                >
+                  Nota enviada por email
+                </ActionButton>
+              </div>
             )}
 
             {stage.id === "carregamento" && !stage.canDriverAdvance && (
@@ -194,44 +249,61 @@ export function TripScreen({
                         </p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <ActionButton
-                        tone="outline"
-                        icon={<Eye className="h-4 w-4" />}
-                        onClick={() => toast("Documento disponivel na aba Docs")}
-                      >
-                        Visualizar
-                      </ActionButton>
-                      <ActionButton
-                        tone="outline"
-                        icon={<Download className="h-4 w-4" />}
-                        onClick={() => toast("Download disponivel na aba Docs")}
-                      >
-                        Baixar
-                      </ActionButton>
-                    </div>
+                    <p className="rounded-2xl bg-background/60 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
+                      Abra a aba Docs para consultar os arquivos do frete.
+                    </p>
                   </div>
                 )}
               </div>
             )}
 
             {stage.id === "descarga" && (
-              <UploadArea
-                done={receipt}
-                title="Anexar comprovante de entrega"
-                doneTitle="Comprovante anexado"
-                hint="Foto, PDF ou canhoto assinado"
-                doneHint="Canhoto enviado para a central"
-                onClick={async () => {
-                  try {
-                    await onDocument("comprovante_entrega", "comprovante-entrega.jpg");
-                    setReceipt(true);
-                    toast.success("Comprovante anexado");
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Nao foi possivel anexar");
-                  }
-                }}
-              />
+              <div className="space-y-2.5">
+                <div className="rounded-3xl border border-border bg-surface-2/40 p-3">
+                  <label className="label-xs" htmlFor="unloaded-tons">
+                    Toneladas descarregadas
+                  </label>
+                  <input
+                    id="unloaded-tons"
+                    value={unloadedTons}
+                    onChange={(event) => setUnloadedTons(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="Ex.: 32,500"
+                    className="mt-2 h-11 w-full rounded-2xl border border-border bg-background px-3 text-[16px] font-extrabold outline-none focus:border-primary"
+                  />
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    Informe a quantidade final descarregada. Em frete por tonelada, este valor
+                    calcula a receita do frete.
+                  </p>
+                </div>
+                <input
+                  ref={receiptInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  capture="environment"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    event.currentTarget.value = "";
+                    if (!file) return;
+                    try {
+                      await onDocument("comprovante_entrega", file.name || "comprovante-entrega.jpg", file);
+                      setReceipt(true);
+                      toast.success("Comprovante anexado");
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Nao foi possivel anexar");
+                    }
+                  }}
+                />
+                <UploadArea
+                  done={receipt}
+                  title="Anexar comprovante de entrega"
+                  doneTitle="Comprovante anexado"
+                  hint="Foto, PDF ou canhoto assinado"
+                  doneHint="Canhoto enviado para a central"
+                  onClick={() => receiptInputRef.current?.click()}
+                />
+              </div>
             )}
 
             {(stage.id === "demanda" ||
@@ -254,61 +326,9 @@ export function TripScreen({
           </motion.div>
         </AnimatePresence>
 
-        <div className="mt-3 shrink-0 overflow-hidden rounded-3xl border border-border">
-          <button
-            onClick={() => setInfo((v) => !v)}
-            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-          >
-            <span className="text-[14px] font-bold">Informacoes da viagem</span>
-            <ChevronDown
-              className={cn(
-                "h-4.5 w-4.5 shrink-0 text-muted-foreground transition-transform",
-                info && "rotate-180",
-              )}
-            />
-          </button>
-          <AnimatePresence initial={false}>
-            {info && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                className="overflow-hidden"
-              >
-                <div className="divide-y divide-border px-4 pb-2">
-                  <Row label="Origem" value={trip.shipper} />
-                  <Row label="Destino" value={trip.receiver} />
-                  <Row label="Placa" value={trip.plate} />
-                  <Row label="Carreta" value={trip.trailer} />
-                  <Row label="Tipo de carga" value={trip.cargo} />
-                  <Row label="Valor do frete" value={trip.freight} />
-                  <Row label="Distancia" value={trip.distance} />
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 px-4 pb-4">
-                  <ActionButton
-                    tone="outline"
-                    icon={<FileText className="h-4 w-4" />}
-                    onClick={() => toast("Abrindo documentos...")}
-                  >
-                    Documentos
-                  </ActionButton>
-                  <ActionButton
-                    tone="outline"
-                    icon={<Phone className="h-4 w-4" />}
-                    onClick={() => toast("Chamando a central...")}
-                  >
-                    Central
-                  </ActionButton>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
         <button
           onClick={() => setHistoryOpen(true)}
-          className="mt-2 flex w-full shrink-0 items-center justify-between gap-4 rounded-3xl border border-border px-4 py-3 text-left"
+          className="mt-2 flex w-full shrink-0 items-center justify-between gap-4 rounded-3xl border border-border px-4 py-2.5 text-left"
         >
           <span className="flex items-center gap-3 text-[14px] font-bold">
             <History className="h-4.5 w-4.5 text-muted-foreground" />
@@ -322,7 +342,7 @@ export function TripScreen({
 
       <div className="absolute inset-x-0 bottom-0 z-20 space-y-2 border-t border-border bg-background/85 px-4 pt-3 pb-3 backdrop-blur-xl">
         <ActionButton
-          onClick={onAdvance}
+          onClick={() => onAdvance(stage.id === "descarga" ? parsedUnloadedTons : undefined)}
           disabled={!canAdvance}
           className="py-3.5 text-[15px]"
           icon={
@@ -332,7 +352,7 @@ export function TripScreen({
               <CheckCircle2 className="h-5.5 w-5.5" />
             )
           }
-          hint={canAdvance ? undefined : "Conclua o item acima para liberar"}
+          hint={canAdvance ? undefined : "Conclua os itens acima para liberar"}
         >
           {stage.action}
         </ActionButton>
@@ -355,6 +375,7 @@ export function TripScreen({
 
 function UploadArea({
   done,
+  loading = false,
   title,
   doneTitle,
   hint,
@@ -362,6 +383,7 @@ function UploadArea({
   onClick,
 }: {
   done: boolean;
+  loading?: boolean;
   title: string;
   doneTitle: string;
   hint: string;
@@ -373,22 +395,29 @@ function UploadArea({
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        "mt-2 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed p-4 text-center",
+        "mt-2 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed p-3 text-center",
         done ? "border-primary/40 bg-primary/8" : "border-border bg-surface-2/30",
       )}
     >
-      <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-primary">
-        {done ? <CheckCircle2 className="h-6 w-6" /> : <Camera className="h-6 w-6" />}
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-surface-2 text-primary">
+        {loading ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : done ? (
+          <CheckCircle2 className="h-5 w-5" />
+        ) : (
+          <Camera className="h-5 w-5" />
+        )}
       </span>
       <span>
-        <span className="block text-[15px] font-bold">{done ? doneTitle : title}</span>
+        <span className="block text-[14px] font-bold">{done ? doneTitle : title}</span>
         <span className="mt-0.5 block text-[12px] text-muted-foreground">
           {done ? doneHint : hint}
         </span>
       </span>
       {!done && (
         <span className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground">
-          <Upload className="h-4 w-4" /> Abrir camera
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {loading ? "Enviando..." : "Abrir camera"}
         </span>
       )}
     </motion.button>

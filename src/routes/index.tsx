@@ -148,13 +148,13 @@ function App() {
     };
   }, [authenticated, refreshContext]);
 
-  const advance = async () => {
+  const advance = async (unloadedTons?: number) => {
     if (!trip.vehicleId || !stage.canDriverAdvance) {
       toast.error("Esta etapa depende da central");
       return;
     }
     try {
-      const next = await advanceDriverStage(trip.vehicleId);
+      const next = await advanceDriverStage(trip.vehicleId, unloadedTons);
       setContext(next);
       toast.success(`${stage.title} confirmado`);
     } catch (error) {
@@ -235,17 +235,17 @@ function App() {
                 stage={stage}
                 trip={trip}
                 documents={context?.documents ?? []}
-                onAdvance={() => void advance()}
-                onDocument={async (kind, fileName) => {
-                  const next = await registerDriverDocument({ kind, fileName });
+                onAdvance={(unloadedTons) => void advance(unloadedTons)}
+                onDocument={async (kind, fileName, file) => {
+                  const next = await registerDriverDocument({ kind, fileName, file });
                   setContext(next);
                 }}
                 onFuel={() => setExpenseOpen(true)}
-                onAssistant={() => setAiOpen(true)}
               />
             )}
             {tab === "docs" && (
               <DocsScreen
+                trip={trip}
                 documents={context?.documents ?? []}
                 onDocument={async (kind, fileName) => {
                   const next = await registerDriverDocument({ kind, fileName });

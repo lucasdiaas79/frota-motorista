@@ -88,6 +88,9 @@ type VehicleRow = {
   recipient_id?: string | null;
   product_id?: string | null;
   freight_value?: number | string | null;
+  freight_pricing_mode?: "fixed" | "per_ton" | null;
+  freight_ton_price?: number | string | null;
+  unloaded_tons?: number | string | null;
   city?: string | null;
   state?: string | null;
   updated_at?: string | null;
@@ -206,6 +209,14 @@ function freightCode(vehicle: VehicleRow | null) {
     : `FRT-${plate}`;
 }
 
+function latestDocument(documents: DriverDocument[], kind: string) {
+  return documents.find((document) => document.kind === kind);
+}
+
+function isRejected(status?: string | null) {
+  return ["rejeitado", "rejected"].includes(String(status ?? "").toLowerCase());
+}
+
 export function tripFromContext(context: DriverAppContext | null): DriverTrip {
   if (!context?.vehicle) {
     return { ...FALLBACK_TRIP, driver: context?.driver.name ?? "-" };
@@ -223,7 +234,10 @@ export function tripFromContext(context: DriverAppContext | null): DriverTrip {
     trailer: trailer || "-",
     shipper: place(context.sender),
     receiver: place(context.recipient),
-    freight: money(context.vehicle.freight_value),
+    freight:
+      context.vehicle.freight_pricing_mode === "per_ton"
+        ? `${money(context.vehicle.freight_ton_price)} / ton`
+        : money(context.vehicle.freight_value),
     distance: "-",
     driver: context.driver.name || "-",
     vehicleId: context.vehicle.id,
@@ -237,6 +251,8 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
   const recipient = place(context?.recipient);
   const currentPlace = [vehicle?.city, vehicle?.state].filter(Boolean).join(" - ");
   const currentFreightId = Boolean(vehicle?.current_freight_id);
+  const latestNote = latestDocument(context?.documents ?? [], "nota_fiscal");
+  const noteRejected = isRejected(latestNote?.status);
 
   if (!vehicle || !currentFreightId) {
     return {
@@ -286,22 +302,35 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
     };
   }
 
-  if (stage === "AGUARDANDO_NOTA" || stage === "NOTA_EM_CONFERENCIA") {
+  if (stage === "AGUARDANDO_NOTA" || stage === "NOTA_EM_CONFERENCIA" || noteRejected) {
     return {
       id: "carregamento",
       index: STAGE_INDEX.carregamento,
       short: "Carga",
-      title: stage === "NOTA_EM_CONFERENCIA" ? "Nota em conferencia" : "Carregamento",
+      title: noteRejected
+        ? "Nota reprovada"
+        : stage === "NOTA_EM_CONFERENCIA"
+          ? "Nota em conferencia"
+          : "Carregamento",
       subtitle:
-        stage === "NOTA_EM_CONFERENCIA"
+        noteRejected
+          ? "A expedicao reprovou a nota. Envie uma nova foto ou informe que ela foi enviada por email."
+          : stage === "NOTA_EM_CONFERENCIA"
           ? "A central esta conferindo a nota fiscal enviada."
-          : "Confirme o caminhao carregado e envie a nota fiscal.",
+          : "Confirme o caminhao carregado e envie a nota fiscal para a expedicao.",
       statusLabel:
-        stage === "NOTA_EM_CONFERENCIA" ? "Nota em conferencia" : "Parado aguardando carga",
-      action: stage === "NOTA_EM_CONFERENCIA" ? "Aguardar central" : "Confirmar caminhao carregado",
+        noteRejected
+          ? "Nota reprovada"
+          : stage === "NOTA_EM_CONFERENCIA"
+            ? "Nota em conferencia"
+            : "Parado aguardando carga",
+      action:
+        noteRejected || stage === "AGUARDANDO_NOTA"
+          ? "Enviar nota"
+          : "Aguardar central",
       place: sender,
       eta: "Carregando",
-      canDriverAdvance: stage === "AGUARDANDO_NOTA",
+      canDriverAdvance: stage === "AGUARDANDO_NOTA" || noteRejected,
     };
   }
 
@@ -393,10 +422,6 @@ function driverLoginEmail(phone: string) {
   return `${normalized}@driver.frotak.local`;
 }
 
-function driverAuthPassword(password: string) {
-  return password === "1234" ? "Frotak1234!" : password;
-}
-
 export async function signInDriver(phone: string, password: string): Promise<Session> {
   if (!hasSupabaseConfig()) {
     throw new Error("Supabase nao configurado para o app motorista.");
@@ -404,7 +429,7 @@ export async function signInDriver(phone: string, password: string): Promise<Ses
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: driverLoginEmail(phone),
-    password: driverAuthPassword(password),
+    password,
   });
 
   if (error) throw error;
@@ -423,10 +448,14 @@ export async function loadDriverContext(): Promise<DriverAppContext> {
   return data as DriverAppContext;
 }
 
-export async function advanceDriverStage(vehicleId: string): Promise<DriverAppContext> {
+export async function advanceDriverStage(
+  vehicleId: string,
+  unloadedTons?: number,
+): Promise<DriverAppContext> {
   const { data, error } = await supabase.rpc("driver_app_advance_stage", {
     p_vehicle_id: vehicleId,
     p_target_stage: null,
+    p_unloaded_tons: unloadedTons ?? null,
   });
   if (error) throw error;
   return data as DriverAppContext;
@@ -437,14 +466,41 @@ export async function registerDriverDocument(input: {
   fileName: string;
   mimeType?: string;
   sizeBytes?: number;
+  file?: File;
 }): Promise<DriverAppContext> {
+  let storageBucket: string | null = null;
+  let storagePath: string | null = null;
+  if (input.file) {
+    const context = await loadDriverContext();
+    const tenantId = context.driver?.tenant_id;
+    const freightId = context.vehicle?.current_freight_id;
+    if (!tenantId || !freightId) throw new Error("Nao foi possivel identificar a viagem ativa.");
+    const safeName = input.file.name.replace(/[^a-zA-Z0-9._-]+/g, "-") || input.fileName;
+    storageBucket = "freight-documents";
+    storagePath = `${tenantId}/${freightId}/${input.kind}/${Date.now()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from(storageBucket)
+      .upload(storagePath, input.file, {
+        contentType: input.file.type || input.mimeType || "application/octet-stream",
+        upsert: false,
+      });
+    if (uploadError) throw uploadError;
+  }
+
   const { data, error } = await supabase.rpc("driver_app_register_document", {
     p_kind: input.kind,
     p_file_name: input.fileName,
-    p_mime_type: input.mimeType ?? null,
-    p_size_bytes: input.sizeBytes ?? null,
+    p_mime_type: input.file?.type || input.mimeType || null,
+    p_size_bytes: input.file?.size ?? input.sizeBytes ?? null,
+    p_storage_bucket: storageBucket,
+    p_storage_path: storagePath,
   });
-  if (error) throw error;
+  if (error) {
+    if (storageBucket && storagePath) {
+      void supabase.storage.from(storageBucket).remove([storagePath]);
+    }
+    throw error;
+  }
   return data as DriverAppContext;
 }
 
