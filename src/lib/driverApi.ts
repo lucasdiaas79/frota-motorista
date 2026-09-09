@@ -461,6 +461,14 @@ export async function advanceDriverStage(
   return data as DriverAppContext;
 }
 
+export async function completeDriverReturn(vehicleId: string): Promise<DriverAppContext> {
+  const { data, error } = await supabase.rpc("driver_app_complete_return", {
+    p_vehicle_id: vehicleId,
+  });
+  if (error) throw error;
+  return data as DriverAppContext;
+}
+
 export async function registerDriverDocument(input: {
   kind: string;
   fileName: string;

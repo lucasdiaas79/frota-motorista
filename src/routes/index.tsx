@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 import {
   advanceDriverStage,
+  completeDriverReturn,
   completeDriverPasswordSetup,
   FALLBACK_STAGE,
   FALLBACK_TRIP,
@@ -154,8 +155,12 @@ function App() {
       return;
     }
     try {
-      const next = await advanceDriverStage(trip.vehicleId, unloadedTons);
+      const next =
+        stage.id === "retorno"
+          ? await completeDriverReturn(trip.vehicleId)
+          : await advanceDriverStage(trip.vehicleId, unloadedTons);
       setContext(next);
+      if (stage.id === "retorno") setTab("home");
       toast.success(`${stage.title} confirmado`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel avancar");
