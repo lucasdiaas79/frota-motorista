@@ -361,7 +361,7 @@ export function TripScreen({
           className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-warning/30 bg-warning/10 py-2.5 text-[13px] font-bold text-warning"
         >
           <Fuel className="h-4.5 w-4.5" />
-          Registrar despesa
+          Registrar entradas e despesas
         </button>
       </div>
 

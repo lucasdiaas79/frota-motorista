@@ -1,23 +1,32 @@
 import { motion } from "motion/react";
+import { useState } from "react";
 import {
   ArrowRight,
+  ArrowDownRight,
+  ArrowUpRight,
   Bell,
-  Clock,
-  Fuel,
+  ChevronRight,
+  History,
   MapPin,
-  MessageSquare,
+  ReceiptText,
   Sparkles,
-  Truck,
-  FileWarning,
 } from "lucide-react";
 import { Chip, ActionButton, SectionTitle } from "./primitives";
+import { Sheet } from "./Sheet";
 import { ProgressBar } from "./Stepper";
-import { DRIVER_STAGE_COUNT, type DriverAppStage, type DriverTrip } from "@/lib/driverApi";
+import {
+  DRIVER_STAGE_COUNT,
+  type DriverAppStage,
+  type DriverFinanceTransaction,
+  type DriverTrip,
+  type DriverTripFinance,
+} from "@/lib/driverApi";
 
 export function HomeScreen({
   driverName,
   stage,
   trip,
+  finance,
   onOpenTrip,
   onAssistant,
   onFuel,
@@ -25,14 +34,16 @@ export function HomeScreen({
   driverName: string;
   stage: DriverAppStage;
   trip: DriverTrip;
+  finance: DriverTripFinance;
   onOpenTrip: () => void;
   onAssistant: () => void;
   onFuel: () => void;
 }) {
+  const [historyOpen, setHistoryOpen] = useState(false);
   const progress = stage.index / (DRIVER_STAGE_COUNT - 1);
   const hasFreight = Boolean(trip.freightId);
   const idle = !hasFreight;
-  const destinationParts = hasFreight ? stage.place.split(" - ") : ["-"];
+  const latestTransactions = finance.transactions.slice(0, 3);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden px-4 pt-3 pb-3">
@@ -93,37 +104,13 @@ export function HomeScreen({
       </motion.div>
 
       <div className="shrink-0">
-        <SectionTitle>Resumo rapido</SectionTitle>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Tile
-            icon={<Truck className="h-4.5 w-4.5" />}
-            label="Veiculo"
-            value={hasFreight ? trip.plate : "-"}
-            sub={hasFreight ? trip.trailer : "-"}
-          />
-          <Tile
-            icon={<Clock className="h-4.5 w-4.5" />}
-            label="Tempo restante"
-            value={hasFreight ? "-" : "0h 00"}
-            sub={hasFreight ? trip.distance : "-"}
-          />
-          <Tile
-            icon={<MapPin className="h-4.5 w-4.5" />}
-            label="Proximo destino"
-            value={destinationParts[0] || "-"}
-            sub={
-              hasFreight && stage.place.includes(" - ")
-                ? destinationParts.slice(1).join(" - ")
-                : "-"
-            }
-          />
-          <Tile
-            icon={<FileWarning className="h-4.5 w-4.5" />}
-            label="Pendencias"
-            value={idle ? "0" : "1"}
-            sub={idle ? "Sem pendencias" : "MDF-e em emissao"}
-          />
-        </div>
+        <SectionTitle>Caixa do frete</SectionTitle>
+        <MiniDre
+          hasFreight={hasFreight}
+          finance={finance}
+          latestTransactions={latestTransactions}
+          onHistory={() => setHistoryOpen(true)}
+        />
       </div>
 
       <button
@@ -141,39 +128,191 @@ export function HomeScreen({
         </span>
       </button>
 
-      <div className="grid shrink-0 grid-cols-2 gap-2.5">
+      <div className="shrink-0">
         <QuickAction
-          icon={<Fuel className="h-4.5 w-4.5" />}
-          label="Registrar despesa"
+          icon={<ReceiptText className="h-4.5 w-4.5" />}
+          label="Registrar entradas e despesas"
           onClick={onFuel}
         />
-        <QuickAction
-          icon={<MessageSquare className="h-4.5 w-4.5" />}
-          label="Central"
-          onClick={onAssistant}
+      </div>
+
+      <Sheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="Historico financeiro">
+        <SectionTitle>Transacoes do frete</SectionTitle>
+        <TransactionList transactions={finance.transactions} />
+      </Sheet>
+    </div>
+  );
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function MiniDre({
+  hasFreight,
+  finance,
+  latestTransactions,
+  onHistory,
+}: {
+  hasFreight: boolean;
+  finance: DriverTripFinance;
+  latestTransactions: DriverFinanceTransaction[];
+  onHistory: () => void;
+}) {
+  const positive = finance.balance >= 0;
+
+  return (
+    <div className="rounded-3xl border border-border bg-surface-2/45 p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="label-xs">Saldo atual</p>
+          <p
+            className={
+              positive
+                ? "mt-1 text-[24px] leading-none font-extrabold text-primary"
+                : "mt-1 text-[24px] leading-none font-extrabold text-destructive"
+            }
+          >
+            {hasFreight ? formatMoney(finance.balance) : "R$ 0,00"}
+          </p>
+          <p className="mt-1 truncate text-[12px] text-muted-foreground">
+            {hasFreight ? "Entradas menos despesas do frete" : "Sem frete ativo"}
+          </p>
+        </div>
+        <button
+          onClick={onHistory}
+          disabled={!hasFreight || finance.transactions.length === 0}
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-2 text-[12px] font-bold disabled:opacity-40"
+        >
+          <History className="h-3.5 w-3.5" />
+          Historico
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <FinanceMetric
+          label="Entradas"
+          value={hasFreight ? formatMoney(finance.income) : "R$ 0,00"}
+          icon={<ArrowUpRight className="h-4 w-4" />}
+          tone="entry"
         />
+        <FinanceMetric
+          label="Despesas"
+          value={hasFreight ? formatMoney(finance.expenses) : "R$ 0,00"}
+          icon={<ArrowDownRight className="h-4 w-4" />}
+          tone="expense"
+        />
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        {hasFreight && latestTransactions.length > 0 ? (
+          latestTransactions.map((transaction) => (
+            <button
+              key={`${transaction.kind}-${transaction.id}`}
+              onClick={onHistory}
+              className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl bg-background/55 px-3 py-2 text-left"
+            >
+              <span
+                className={
+                  transaction.kind === "entry"
+                    ? "grid h-7 w-7 place-items-center rounded-full bg-primary/12 text-primary"
+                    : "grid h-7 w-7 place-items-center rounded-full bg-warning/12 text-warning"
+                }
+              >
+                {transaction.kind === "entry" ? (
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[12px] font-bold">{transaction.label}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {transaction.detail}
+                </span>
+              </span>
+              <span className="text-right text-[12px] font-extrabold">
+                {transaction.kind === "entry" ? "+" : "-"} {formatMoney(transaction.amount)}
+              </span>
+            </button>
+          ))
+        ) : (
+          <div className="flex items-center justify-between rounded-2xl bg-background/55 px-3 py-2.5 text-[12px] text-muted-foreground">
+            <span>Nenhuma transacao neste frete.</span>
+            <ChevronRight className="h-4 w-4" />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function Tile({
-  icon,
+function FinanceMetric({
   label,
   value,
-  sub,
+  icon,
+  tone,
 }: {
-  icon: React.ReactNode;
   label: string;
   value: string;
-  sub: string;
+  icon: React.ReactNode;
+  tone: "entry" | "expense";
 }) {
   return (
-    <div className="min-h-[84px] rounded-2xl border border-border bg-surface-2/40 p-3">
-      <span className="text-primary">{icon}</span>
-      <p className="label-xs mt-2">{label}</p>
-      <p className="mt-0.5 truncate text-[15px] font-extrabold">{value}</p>
-      <p className="truncate text-xs text-muted-foreground">{sub}</p>
+    <div className="rounded-2xl bg-background/55 px-3 py-2.5">
+      <div className={tone === "entry" ? "text-primary" : "text-warning"}>{icon}</div>
+      <p className="label-xs mt-1">{label}</p>
+      <p className="mt-0.5 truncate text-[13px] font-extrabold">{value}</p>
+    </div>
+  );
+}
+
+function TransactionList({ transactions }: { transactions: DriverFinanceTransaction[] }) {
+  if (transactions.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface-2/40 p-4 text-[13px] font-semibold text-muted-foreground">
+        Nenhuma entrada ou despesa registrada neste frete.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {transactions.map((transaction) => (
+        <div
+          key={`${transaction.kind}-${transaction.id}`}
+          className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-border bg-surface-2/35 p-3"
+        >
+          <span
+            className={
+              transaction.kind === "entry"
+                ? "grid h-9 w-9 place-items-center rounded-full bg-primary/12 text-primary"
+                : "grid h-9 w-9 place-items-center rounded-full bg-warning/12 text-warning"
+            }
+          >
+            {transaction.kind === "entry" ? (
+              <ArrowUpRight className="h-4.5 w-4.5" />
+            ) : (
+              <ArrowDownRight className="h-4.5 w-4.5" />
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[14px] font-bold">{transaction.label}</span>
+            <span className="block truncate text-[12px] text-muted-foreground">
+              {transaction.detail} · {formatDateTime(transaction.recordedAt)}
+            </span>
+          </span>
+          <span className="text-right text-[13px] font-extrabold">
+            {transaction.kind === "entry" ? "+" : "-"} {formatMoney(transaction.amount)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -191,7 +330,7 @@ function QuickAction({
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className="flex min-h-11 items-center justify-center gap-2.5 rounded-2xl bg-secondary px-3 py-2.5 text-[13px] font-bold"
+      className="flex min-h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-secondary px-3 py-3 text-[13px] font-bold"
     >
       <span className="text-primary">{icon}</span>
       {label}

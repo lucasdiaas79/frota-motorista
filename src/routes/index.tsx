@@ -21,8 +21,10 @@ import {
   completeDriverPasswordSetup,
   FALLBACK_STAGE,
   FALLBACK_TRIP,
+  financeFromContext,
   getInitialSession,
   loadDriverContext,
+  registerDriverCashEntry,
   registerDriverDocument,
   registerDriverExpense,
   registerDriverFuel,
@@ -84,6 +86,7 @@ function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const stage = useMemo(() => stageFromContext(context), [context]);
   const trip = useMemo(() => tripFromContext(context), [context]);
+  const finance = useMemo(() => financeFromContext(context), [context]);
 
   const refreshContext = useCallback(async () => {
     const next = await loadDriverContext();
@@ -230,6 +233,7 @@ function App() {
                 driverName={context?.driver.name ?? "-"}
                 stage={stage}
                 trip={trip}
+                finance={finance}
                 onOpenTrip={() => setTab("trip")}
                 onAssistant={() => setAiOpen(true)}
                 onFuel={() => setExpenseOpen(true)}
@@ -294,6 +298,10 @@ function App() {
           }}
           onSave={async (input) => {
             const next = await registerDriverExpense(input);
+            setContext(next);
+          }}
+          onSaveEntry={async (input) => {
+            const next = await registerDriverCashEntry(input);
             setContext(next);
           }}
         />

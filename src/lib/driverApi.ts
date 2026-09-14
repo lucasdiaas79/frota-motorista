@@ -135,6 +135,41 @@ export type DriverDocument = {
   created_at: string;
 };
 
+export type DriverCashEntry = {
+  id: string;
+  origin: string;
+  amount: number | string;
+  notes?: string | null;
+  source?: string | null;
+  recordedAt: string;
+};
+
+export type DriverExpenseEntry = {
+  id: string;
+  category: string;
+  description: string;
+  amount: number | string;
+  notes?: string | null;
+  fuelRecordId?: string | null;
+  recordedAt: string;
+};
+
+export type DriverFinanceTransaction = {
+  id: string;
+  kind: "entry" | "expense";
+  label: string;
+  detail: string;
+  amount: number;
+  recordedAt: string;
+};
+
+export type DriverTripFinance = {
+  income: number;
+  expenses: number;
+  balance: number;
+  transactions: DriverFinanceTransaction[];
+};
+
 export type DriverAppContext = {
   driver: DriverRow;
   profile: DriverProfileRow | null;
@@ -144,6 +179,8 @@ export type DriverAppContext = {
   recipient: PartyRow | null;
   product: ProductRow | null;
   documents: DriverDocument[];
+  cashEntries?: DriverCashEntry[];
+  expenses?: DriverExpenseEntry[];
 };
 
 export const FALLBACK_STAGE: DriverAppStage = {
@@ -242,6 +279,53 @@ export function tripFromContext(context: DriverAppContext | null): DriverTrip {
     driver: context.driver.name || "-",
     vehicleId: context.vehicle.id,
     freightId: context.vehicle.current_freight_id ?? undefined,
+  };
+}
+
+function numericValue(value: number | string | null | undefined) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+const EXPENSE_LABELS: Record<string, string> = {
+  diesel_s10: "Diesel S10",
+  arla: "Arla",
+  pedagio: "Pedagio",
+  alimentacao: "Alimentacao",
+  estacionamento: "Estacionamento",
+  manutencao: "Manutencao",
+  outros: "Outros",
+};
+
+export function financeFromContext(context: DriverAppContext | null): DriverTripFinance {
+  const cashEntries = context?.cashEntries ?? [];
+  const expenses = context?.expenses ?? [];
+  const income = cashEntries.reduce((total, entry) => total + numericValue(entry.amount), 0);
+  const expenseTotal = expenses.reduce((total, expense) => total + numericValue(expense.amount), 0);
+  const transactions: DriverFinanceTransaction[] = [
+    ...cashEntries.map((entry) => ({
+      id: entry.id,
+      kind: "entry" as const,
+      label: entry.origin || "Entrada",
+      detail: entry.notes || "Entrada do frete",
+      amount: numericValue(entry.amount),
+      recordedAt: entry.recordedAt,
+    })),
+    ...expenses.map((expense) => ({
+      id: expense.id,
+      kind: "expense" as const,
+      label: EXPENSE_LABELS[expense.category] ?? "Despesa",
+      detail: expense.description || expense.notes || "Despesa do frete",
+      amount: numericValue(expense.amount),
+      recordedAt: expense.recordedAt,
+    })),
+  ].sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime());
+
+  return {
+    income,
+    expenses: expenseTotal,
+    balance: income - expenseTotal,
+    transactions,
   };
 }
 
@@ -632,6 +716,20 @@ export async function registerDriverExpense(input: {
   return data as DriverAppContext;
 }
 
+export async function registerDriverCashEntry(input: {
+  origin: string;
+  amount: number;
+  notes?: string;
+}): Promise<DriverAppContext> {
+  const { data, error } = await supabase.rpc("driver_app_register_cash_entry", {
+    p_origin: input.origin,
+    p_amount: input.amount,
+    p_notes: input.notes ?? null,
+  });
+  if (error) throw error;
+  return data as DriverAppContext;
+}
+
 export async function completeDriverPasswordSetup(newPassword: string): Promise<DriverAppContext> {
   const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
   if (passwordError) throw passwordError;
@@ -648,6 +746,7 @@ export function subscribeDriverOperationalChanges(onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_documents" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "fuel_records" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_expenses" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "freight_cash_entries" }, onChange)
     .subscribe();
 
   return () => {
