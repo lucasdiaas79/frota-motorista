@@ -27,6 +27,8 @@ export function HomeScreen({
   stage,
   trip,
   finance,
+  financeScope,
+  tripCycleFreightCount,
   onOpenTrip,
   onAssistant,
   onFuel,
@@ -35,6 +37,8 @@ export function HomeScreen({
   stage: DriverAppStage;
   trip: DriverTrip;
   finance: DriverTripFinance;
+  financeScope: "freight" | "trip";
+  tripCycleFreightCount?: number;
   onOpenTrip: () => void;
   onAssistant: () => void;
   onFuel: () => void;
@@ -42,8 +46,11 @@ export function HomeScreen({
   const [historyOpen, setHistoryOpen] = useState(false);
   const progress = stage.index / (DRIVER_STAGE_COUNT - 1);
   const hasFreight = Boolean(trip.freightId);
+  const tripScoped = financeScope === "trip";
+  const hasFinancialScope = hasFreight || tripScoped;
   const idle = !hasFreight;
   const latestTransactions = finance.transactions.slice(0, 3);
+  const scopeLabel = tripScoped ? "viagem" : "frete";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden px-4 pt-3 pb-3">
@@ -74,11 +81,9 @@ export function HomeScreen({
           </span>
         </div>
 
-        <h2 className="mt-3 text-[26px] leading-[1.05] font-extrabold">
-          {idle ? "Nenhuma viagem ativa" : stage.title}
-        </h2>
+        <h2 className="mt-3 text-[26px] leading-[1.05] font-extrabold">{stage.title}</h2>
         <p className="mt-1 line-clamp-2 text-[14px] text-muted-foreground">
-          {idle ? "Aguardando comando da central." : stage.subtitle}
+          {stage.subtitle}
         </p>
 
         {!idle && (
@@ -104,11 +109,13 @@ export function HomeScreen({
       </motion.div>
 
       <div className="shrink-0">
-        <SectionTitle>Caixa do frete</SectionTitle>
+        <SectionTitle>Caixa da {scopeLabel}</SectionTitle>
         <MiniDre
-          hasFreight={hasFreight}
+          hasFinancialScope={hasFinancialScope}
           finance={finance}
           latestTransactions={latestTransactions}
+          scopeLabel={scopeLabel}
+          tripCycleFreightCount={tripCycleFreightCount}
           onHistory={() => setHistoryOpen(true)}
         />
       </div>
@@ -137,8 +144,8 @@ export function HomeScreen({
       </div>
 
       <Sheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="Historico financeiro">
-        <SectionTitle>Transacoes do frete</SectionTitle>
-        <TransactionList transactions={finance.transactions} />
+        <SectionTitle>Transacoes da {scopeLabel}</SectionTitle>
+        <TransactionList transactions={finance.transactions} scopeLabel={scopeLabel} />
       </Sheet>
     </div>
   );
@@ -155,14 +162,18 @@ function formatDateTime(value: string) {
 }
 
 function MiniDre({
-  hasFreight,
+  hasFinancialScope,
   finance,
   latestTransactions,
+  scopeLabel,
+  tripCycleFreightCount,
   onHistory,
 }: {
-  hasFreight: boolean;
+  hasFinancialScope: boolean;
   finance: DriverTripFinance;
   latestTransactions: DriverFinanceTransaction[];
+  scopeLabel: string;
+  tripCycleFreightCount?: number;
   onHistory: () => void;
 }) {
   const positive = finance.balance >= 0;
@@ -179,15 +190,20 @@ function MiniDre({
                 : "mt-1 text-[24px] leading-none font-extrabold text-destructive"
             }
           >
-            {hasFreight ? formatMoney(finance.balance) : "R$ 0,00"}
+            {hasFinancialScope ? formatMoney(finance.balance) : "R$ 0,00"}
           </p>
           <p className="mt-1 truncate text-[12px] text-muted-foreground">
-            {hasFreight ? "Entradas menos despesas do frete" : "Sem frete ativo"}
+            {hasFinancialScope
+              ? `Entradas menos despesas da ${scopeLabel}`
+              : `Sem ${scopeLabel} ativa`}
+            {scopeLabel === "viagem" && tripCycleFreightCount
+              ? ` - ${tripCycleFreightCount} frete${tripCycleFreightCount === 1 ? "" : "s"}`
+              : ""}
           </p>
         </div>
         <button
           onClick={onHistory}
-          disabled={!hasFreight || finance.transactions.length === 0}
+          disabled={!hasFinancialScope || finance.transactions.length === 0}
           className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-2 text-[12px] font-bold disabled:opacity-40"
         >
           <History className="h-3.5 w-3.5" />
@@ -198,20 +214,20 @@ function MiniDre({
       <div className="mt-3 grid grid-cols-2 gap-2">
         <FinanceMetric
           label="Entradas"
-          value={hasFreight ? formatMoney(finance.income) : "R$ 0,00"}
+          value={hasFinancialScope ? formatMoney(finance.income) : "R$ 0,00"}
           icon={<ArrowUpRight className="h-4 w-4" />}
           tone="entry"
         />
         <FinanceMetric
           label="Despesas"
-          value={hasFreight ? formatMoney(finance.expenses) : "R$ 0,00"}
+          value={hasFinancialScope ? formatMoney(finance.expenses) : "R$ 0,00"}
           icon={<ArrowDownRight className="h-4 w-4" />}
           tone="expense"
         />
       </div>
 
       <div className="mt-3 space-y-1.5">
-        {hasFreight && latestTransactions.length > 0 ? (
+        {hasFinancialScope && latestTransactions.length > 0 ? (
           latestTransactions.map((transaction) => (
             <button
               key={`${transaction.kind}-${transaction.id}`}
@@ -244,7 +260,7 @@ function MiniDre({
           ))
         ) : (
           <div className="flex items-center justify-between rounded-2xl bg-background/55 px-3 py-2.5 text-[12px] text-muted-foreground">
-            <span>Nenhuma transacao neste frete.</span>
+            <span>Nenhuma transacao nesta {scopeLabel}.</span>
             <ChevronRight className="h-4 w-4" />
           </div>
         )}
@@ -273,11 +289,17 @@ function FinanceMetric({
   );
 }
 
-function TransactionList({ transactions }: { transactions: DriverFinanceTransaction[] }) {
+function TransactionList({
+  transactions,
+  scopeLabel,
+}: {
+  transactions: DriverFinanceTransaction[];
+  scopeLabel: string;
+}) {
   if (transactions.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-surface-2/40 p-4 text-[13px] font-semibold text-muted-foreground">
-        Nenhuma entrada ou despesa registrada neste frete.
+        Nenhuma entrada ou despesa registrada nesta {scopeLabel}.
       </div>
     );
   }
@@ -305,7 +327,7 @@ function TransactionList({ transactions }: { transactions: DriverFinanceTransact
           <span className="min-w-0">
             <span className="block truncate text-[14px] font-bold">{transaction.label}</span>
             <span className="block truncate text-[12px] text-muted-foreground">
-              {transaction.detail} · {formatDateTime(transaction.recordedAt)}
+              {transaction.detail} - {formatDateTime(transaction.recordedAt)}
             </span>
           </span>
           <span className="text-right text-[13px] font-extrabold">

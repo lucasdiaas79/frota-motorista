@@ -234,6 +234,8 @@ function App() {
                 stage={stage}
                 trip={trip}
                 finance={finance}
+                financeScope={context?.config.expenseScope ?? "freight"}
+                tripCycleFreightCount={context?.tripCycle?.freightCount}
                 onOpenTrip={() => setTab("trip")}
                 onAssistant={() => setAiOpen(true)}
                 onFuel={() => setExpenseOpen(true)}
@@ -292,6 +294,7 @@ function App() {
         <ExpenseSheet
           open={expenseOpen}
           onClose={() => setExpenseOpen(false)}
+          financeScope={context?.config.expenseScope ?? "freight"}
           onFuel={() => {
             setExpenseOpen(false);
             setFuelOpen(true);

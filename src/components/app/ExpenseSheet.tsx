@@ -23,10 +23,12 @@ export function ExpenseSheet({
   onFuel,
   onSave,
   onSaveEntry,
+  financeScope,
 }: {
   open: boolean;
   onClose: () => void;
   onFuel: () => void;
+  financeScope: "freight" | "trip";
   onSave: (input: {
     category: ExpenseCategory;
     description: string;
@@ -48,6 +50,7 @@ export function ExpenseSheet({
   const [entryNotes, setEntryNotes] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const scopeLabel = financeScope === "trip" ? "na viagem atual" : "no frete atual";
 
   const resetExpense = () => {
     setDescription("");
@@ -164,7 +167,7 @@ export function ExpenseSheet({
               <span>
                 <span className="block text-[15px] font-bold">Abastecimento</span>
                 <span className="block text-[12px] opacity-80">
-                  Diesel ou Arla entram no frete atual
+                  Diesel ou Arla entram {scopeLabel}
                 </span>
               </span>
             </motion.button>

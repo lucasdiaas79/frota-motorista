@@ -159,6 +159,7 @@ export type DriverCashEntry = {
   notes?: string | null;
   source?: string | null;
   recordedAt: string;
+  tripCycleId?: string | null;
 };
 
 export type DriverExpenseEntry = {
@@ -169,6 +170,16 @@ export type DriverExpenseEntry = {
   notes?: string | null;
   fuelRecordId?: string | null;
   recordedAt: string;
+  tripCycleId?: string | null;
+};
+
+export type DriverTripCycle = {
+  id: string;
+  status: "open" | "closed" | "cancelled";
+  startedAt: string;
+  closedAt?: string | null;
+  freightCount?: number;
+  completedFreightCount?: number;
 };
 
 export type DriverFinanceTransaction = {
@@ -191,6 +202,7 @@ export type DriverAppContext = {
   driver: DriverRow;
   tenant: DriverTenantInfo | null;
   config: DriverAppConfig;
+  tripCycle: DriverTripCycle | null;
   profile: DriverProfileRow | null;
   vehicle: VehicleRow | null;
   trailers: TrailerRow[];
@@ -316,6 +328,7 @@ function normalizeDriverAppContext(data: unknown): DriverAppContext {
     driver: context.driver,
     tenant: context.tenant ?? null,
     config: normalizeDriverAppConfig(context.config),
+    tripCycle: context.tripCycle ?? null,
     profile: context.profile ?? null,
     vehicle: context.vehicle ?? null,
     trailers: context.trailers ?? [],
@@ -409,6 +422,9 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
   const recipient = place(context?.recipient);
   const currentPlace = [vehicle?.city, vehicle?.state].filter(Boolean).join(" - ");
   const currentFreightId = Boolean(vehicle?.current_freight_id);
+  const longTripOpen =
+    context?.config.driverAppMode === "long_trip_multi_freight" &&
+    context?.tripCycle?.status === "open";
   const latestNote = latestDocument(context?.documents ?? [], "nota_fiscal");
   const noteRejected = isRejected(latestNote?.status);
 
@@ -418,9 +434,11 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
       id: "concluida",
       index: STAGE_INDEX.concluida,
       short: "Livre",
-      title: "Nenhuma viagem ativa",
-      subtitle: "Aguarde uma nova demanda da central.",
-      statusLabel: "Aguardando comando",
+      title: longTripOpen ? "Aguardando proximo frete" : "Nenhuma viagem ativa",
+      subtitle: longTripOpen
+        ? "Sua viagem longa continua aberta. Aguarde a central enviar o proximo frete."
+        : "Aguarde uma nova demanda da central.",
+      statusLabel: longTripOpen ? "Viagem aberta" : "Aguardando comando",
       action: "Atualizar dados",
       place: currentPlace || "-",
       eta: "-",
@@ -817,6 +835,8 @@ export function subscribeDriverOperationalChanges(onChange: () => void) {
   const channel = supabase
     .channel("driver-app-operational-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "vehicles" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "freights" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "driver_trip_cycles" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_documents" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "fuel_records" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_expenses" }, onChange)
