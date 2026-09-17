@@ -64,6 +64,23 @@ export type DriverTrip = {
   freightId?: string;
 };
 
+export type DriverAppMode = "single_freight" | "long_trip_multi_freight";
+export type DriverAssetAssignmentMode = "fixed_vehicle" | "manual_per_freight";
+export type DriverExpenseScope = "freight" | "trip";
+
+export type DriverAppConfig = {
+  driverAppMode: DriverAppMode;
+  assetAssignmentMode: DriverAssetAssignmentMode;
+  expenseScope: DriverExpenseScope;
+};
+
+export type DriverTenantInfo = {
+  id: string;
+  slug: string;
+  tradeName?: string | null;
+  legalName?: string | null;
+};
+
 type DriverRow = {
   id: string;
   tenant_id: string;
@@ -172,6 +189,8 @@ export type DriverTripFinance = {
 
 export type DriverAppContext = {
   driver: DriverRow;
+  tenant: DriverTenantInfo | null;
+  config: DriverAppConfig;
   profile: DriverProfileRow | null;
   vehicle: VehicleRow | null;
   trailers: TrailerRow[];
@@ -181,6 +200,12 @@ export type DriverAppContext = {
   documents: DriverDocument[];
   cashEntries?: DriverCashEntry[];
   expenses?: DriverExpenseEntry[];
+};
+
+export const DEFAULT_DRIVER_APP_CONFIG: DriverAppConfig = {
+  driverAppMode: "single_freight",
+  assetAssignmentMode: "fixed_vehicle",
+  expenseScope: "freight",
 };
 
 export const FALLBACK_STAGE: DriverAppStage = {
@@ -252,6 +277,55 @@ function latestDocument(documents: DriverDocument[], kind: string) {
 
 function isRejected(status?: string | null) {
   return ["rejeitado", "rejected"].includes(String(status ?? "").toLowerCase());
+}
+
+function isDriverAppMode(value: unknown): value is DriverAppMode {
+  return value === "single_freight" || value === "long_trip_multi_freight";
+}
+
+function isAssetAssignmentMode(value: unknown): value is DriverAssetAssignmentMode {
+  return value === "fixed_vehicle" || value === "manual_per_freight";
+}
+
+function isExpenseScope(value: unknown): value is DriverExpenseScope {
+  return value === "freight" || value === "trip";
+}
+
+function normalizeDriverAppConfig(value: unknown): DriverAppConfig {
+  const config = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const mode = config.driverAppMode ?? config.mode;
+  const assetMode = config.assetAssignmentMode ?? config.asset_assignment_mode;
+  const expenseScope = config.expenseScope ?? config.expense_scope;
+
+  return {
+    driverAppMode: isDriverAppMode(mode) ? mode : DEFAULT_DRIVER_APP_CONFIG.driverAppMode,
+    assetAssignmentMode: isAssetAssignmentMode(assetMode)
+      ? assetMode
+      : DEFAULT_DRIVER_APP_CONFIG.assetAssignmentMode,
+    expenseScope: isExpenseScope(expenseScope) ? expenseScope : DEFAULT_DRIVER_APP_CONFIG.expenseScope,
+  };
+}
+
+function normalizeDriverAppContext(data: unknown): DriverAppContext {
+  const context = data && typeof data === "object" ? (data as Partial<DriverAppContext>) : null;
+  if (!context?.driver) {
+    throw new Error("Contexto do motorista nao retornado pelo servidor.");
+  }
+
+  return {
+    driver: context.driver,
+    tenant: context.tenant ?? null,
+    config: normalizeDriverAppConfig(context.config),
+    profile: context.profile ?? null,
+    vehicle: context.vehicle ?? null,
+    trailers: context.trailers ?? [],
+    sender: context.sender ?? null,
+    recipient: context.recipient ?? null,
+    product: context.product ?? null,
+    documents: context.documents ?? [],
+    cashEntries: context.cashEntries ?? [],
+    expenses: context.expenses ?? [],
+  };
 }
 
 export function tripFromContext(context: DriverAppContext | null): DriverTrip {
@@ -529,7 +603,7 @@ export async function signOutDriver() {
 export async function loadDriverContext(): Promise<DriverAppContext> {
   const { data, error } = await supabase.rpc("get_driver_app_context");
   if (error) throw error;
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export async function advanceDriverStage(
@@ -542,7 +616,7 @@ export async function advanceDriverStage(
     p_unloaded_tons: unloadedTons ?? null,
   });
   if (error) throw error;
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export async function completeDriverReturn(vehicleId: string): Promise<DriverAppContext> {
@@ -550,7 +624,7 @@ export async function completeDriverReturn(vehicleId: string): Promise<DriverApp
     p_vehicle_id: vehicleId,
   });
   if (error) throw error;
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export async function registerDriverDocument(input: {
@@ -593,7 +667,7 @@ export async function registerDriverDocument(input: {
     }
     throw error;
   }
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export async function registerDriverFuel(input: {
@@ -646,7 +720,7 @@ export async function registerDriverFuel(input: {
       p_receipt_photo_size_bytes: receiptPhoto?.sizeBytes ?? null,
     });
     if (error) throw error;
-    return data as DriverAppContext;
+    return normalizeDriverAppContext(data);
   } catch (error) {
     if (uploadedPaths.length) {
       void supabase.storage.from(FUEL_DOCUMENTS_BUCKET).remove(uploadedPaths);
@@ -713,7 +787,7 @@ export async function registerDriverExpense(input: {
     p_notes: input.notes ?? null,
   });
   if (error) throw error;
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export async function registerDriverCashEntry(input: {
@@ -727,7 +801,7 @@ export async function registerDriverCashEntry(input: {
     p_notes: input.notes ?? null,
   });
   if (error) throw error;
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export async function completeDriverPasswordSetup(newPassword: string): Promise<DriverAppContext> {
@@ -736,7 +810,7 @@ export async function completeDriverPasswordSetup(newPassword: string): Promise<
 
   const { data, error } = await supabase.rpc("driver_app_complete_password_setup");
   if (error) throw error;
-  return data as DriverAppContext;
+  return normalizeDriverAppContext(data);
 }
 
 export function subscribeDriverOperationalChanges(onChange: () => void) {
