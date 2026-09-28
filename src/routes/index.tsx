@@ -23,17 +23,20 @@ import {
   FALLBACK_TRIP,
   financeFromContext,
   getInitialSession,
+  listDriverCashEntryStations,
   loadDriverContext,
   registerDriverCashEntry,
   registerDriverDocument,
   registerDriverExpense,
   registerDriverFuel,
+  registerDriverStationCashEntry,
   signInDriver,
   signOutDriver,
   stageFromContext,
   subscribeDriverOperationalChanges,
   tripFromContext,
   type DriverAppContext,
+  type DriverCashEntryStation,
 } from "@/lib/driverApi";
 
 export const Route = createFileRoute("/")({
@@ -81,12 +84,37 @@ function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [fuelOpen, setFuelOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [cashEntryStations, setCashEntryStations] = useState<DriverCashEntryStation[]>([]);
+  const [cashEntryStationsLoading, setCashEntryStationsLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [context, setContext] = useState<DriverAppContext | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const stage = useMemo(() => stageFromContext(context), [context]);
   const trip = useMemo(() => tripFromContext(context), [context]);
   const finance = useMemo(() => financeFromContext(context), [context]);
+
+  useEffect(() => {
+    if (!expenseOpen || context?.config.expenseScope !== "trip") return;
+
+    let active = true;
+    setCashEntryStationsLoading(true);
+    void listDriverCashEntryStations()
+      .then((stations) => {
+        if (active) setCashEntryStations(stations);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setCashEntryStations([]);
+        toast.error(error instanceof Error ? error.message : "Nao foi possivel carregar os postos");
+      })
+      .finally(() => {
+        if (active) setCashEntryStationsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [expenseOpen, context?.config.expenseScope]);
 
   const refreshContext = useCallback(async () => {
     const next = await loadDriverContext();
@@ -295,6 +323,8 @@ function App() {
           open={expenseOpen}
           onClose={() => setExpenseOpen(false)}
           financeScope={context?.config.expenseScope ?? "freight"}
+          stations={cashEntryStations}
+          stationsLoading={cashEntryStationsLoading}
           onFuel={() => {
             setExpenseOpen(false);
             setFuelOpen(true);
@@ -304,7 +334,17 @@ function App() {
             setContext(next);
           }}
           onSaveEntry={async (input) => {
-            const next = await registerDriverCashEntry(input);
+            const next = input.stationPartnerId
+              ? await registerDriverStationCashEntry({
+                  stationPartnerId: input.stationPartnerId,
+                  amount: input.amount,
+                  notes: input.notes,
+                })
+              : await registerDriverCashEntry({
+                  origin: input.origin ?? "Entrada",
+                  amount: input.amount,
+                  notes: input.notes,
+                });
             setContext(next);
           }}
         />

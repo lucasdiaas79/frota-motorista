@@ -155,6 +155,8 @@ export type DriverDocument = {
 export type DriverCashEntry = {
   id: string;
   origin: string;
+  businessPartnerId?: string | null;
+  stationName?: string | null;
   amount: number | string;
   notes?: string | null;
   source?: string | null;
@@ -169,9 +171,17 @@ export type DriverExpenseEntry = {
   amount: number | string;
   notes?: string | null;
   fuelRecordId?: string | null;
+  paymentSource?: "trip_cash" | "company_payable" | null;
   recordedAt: string;
   tripCycleId?: string | null;
 };
+
+export type DriverCashEntryStation = {
+  id: string;
+  name: string;
+};
+
+export type DriverExpensePaymentSource = "trip_cash" | "company_payable";
 
 export type DriverTripCycle = {
   id: string;
@@ -314,7 +324,9 @@ function normalizeDriverAppConfig(value: unknown): DriverAppConfig {
     assetAssignmentMode: isAssetAssignmentMode(assetMode)
       ? assetMode
       : DEFAULT_DRIVER_APP_CONFIG.assetAssignmentMode,
-    expenseScope: isExpenseScope(expenseScope) ? expenseScope : DEFAULT_DRIVER_APP_CONFIG.expenseScope,
+    expenseScope: isExpenseScope(expenseScope)
+      ? expenseScope
+      : DEFAULT_DRIVER_APP_CONFIG.expenseScope,
   };
 }
 
@@ -386,7 +398,9 @@ const EXPENSE_LABELS: Record<string, string> = {
 
 export function financeFromContext(context: DriverAppContext | null): DriverTripFinance {
   const cashEntries = context?.cashEntries ?? [];
-  const expenses = context?.expenses ?? [];
+  const expenses = (context?.expenses ?? []).filter(
+    (expense) => expense.paymentSource !== "company_payable",
+  );
   const income = cashEntries.reduce((total, entry) => total + numericValue(entry.amount), 0);
   const expenseTotal = expenses.reduce((total, expense) => total + numericValue(expense.amount), 0);
   const transactions: DriverFinanceTransaction[] = [
@@ -488,22 +502,17 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
         : stage === "NOTA_EM_CONFERENCIA"
           ? "Nota em conferencia"
           : "Carregamento",
-      subtitle:
-        noteRejected
-          ? "A expedicao reprovou a nota. Envie uma nova foto ou informe que ela foi enviada por email."
-          : stage === "NOTA_EM_CONFERENCIA"
+      subtitle: noteRejected
+        ? "A expedicao reprovou a nota. Envie uma nova foto ou informe que ela foi enviada por email."
+        : stage === "NOTA_EM_CONFERENCIA"
           ? "A central esta conferindo a nota fiscal enviada."
           : "Confirme o caminhao carregado e envie a nota fiscal para a expedicao.",
-      statusLabel:
-        noteRejected
-          ? "Nota reprovada"
-          : stage === "NOTA_EM_CONFERENCIA"
-            ? "Nota em conferencia"
-            : "Parado aguardando carga",
-      action:
-        noteRejected || stage === "AGUARDANDO_NOTA"
-          ? "Enviar nota"
-          : "Aguardar central",
+      statusLabel: noteRejected
+        ? "Nota reprovada"
+        : stage === "NOTA_EM_CONFERENCIA"
+          ? "Nota em conferencia"
+          : "Parado aguardando carga",
+      action: noteRejected || stage === "AGUARDANDO_NOTA" ? "Enviar nota" : "Aguardar central",
       place: sender,
       eta: "Carregando",
       canDriverAdvance: stage === "AGUARDANDO_NOTA" || noteRejected,
@@ -713,7 +722,12 @@ export async function registerDriverFuel(input: {
   const uploadedPaths: string[] = [];
   try {
     const pumpPhoto = await uploadFuelPhoto(tenantId, "pump_photo", input.pumpPhoto, uploadedPaths);
-    const receiptPhoto = await uploadFuelPhoto(tenantId, "receipt_photo", input.receiptPhoto, uploadedPaths);
+    const receiptPhoto = await uploadFuelPhoto(
+      tenantId,
+      "receipt_photo",
+      input.receiptPhoto,
+      uploadedPaths,
+    );
 
     const { data, error } = await supabase.rpc("driver_app_register_fuel_document", {
       p_station: input.station,
@@ -797,10 +811,39 @@ export async function registerDriverExpense(input: {
   description: string;
   amount: number;
   notes?: string;
+  paymentSource?: DriverExpensePaymentSource;
 }): Promise<DriverAppContext> {
-  const { data, error } = await supabase.rpc("driver_app_register_expense", {
+  const { data, error } = await supabase.rpc("driver_app_register_expense_v2", {
     p_category: input.category,
     p_description: input.description,
+    p_amount: input.amount,
+    p_notes: input.notes ?? null,
+    p_payment_source: input.paymentSource ?? "company_payable",
+  });
+  if (error) throw error;
+  return normalizeDriverAppContext(data);
+}
+
+export async function listDriverCashEntryStations(): Promise<DriverCashEntryStation[]> {
+  const { data, error } = await supabase.rpc("get_driver_cash_entry_stations");
+  if (error) throw error;
+  if (!Array.isArray(data)) return [];
+
+  return data.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const station = item as Record<string, unknown>;
+    if (typeof station.id !== "string" || typeof station.name !== "string") return [];
+    return [{ id: station.id, name: station.name }];
+  });
+}
+
+export async function registerDriverStationCashEntry(input: {
+  stationPartnerId: string;
+  amount: number;
+  notes?: string;
+}): Promise<DriverAppContext> {
+  const { data, error } = await supabase.rpc("driver_app_register_station_cash_entry", {
+    p_station_partner_id: input.stationPartnerId,
     p_amount: input.amount,
     p_notes: input.notes ?? null,
   });
@@ -840,7 +883,11 @@ export function subscribeDriverOperationalChanges(onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_documents" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "fuel_records" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_expenses" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "freight_cash_entries" }, onChange)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "freight_cash_entries" },
+      onChange,
+    )
     .subscribe();
 
   return () => {

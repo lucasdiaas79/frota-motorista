@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowDownRight, ArrowUpRight, Fuel, Loader2, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet } from "./Sheet";
 import { ActionButton } from "./primitives";
 import { cn } from "@/lib/utils";
+import type { DriverCashEntryStation, DriverExpensePaymentSource } from "@/lib/driverApi";
 
 const CATEGORIES = [
   { value: "pedagio", label: "Pedagio" },
@@ -24,19 +25,25 @@ export function ExpenseSheet({
   onSave,
   onSaveEntry,
   financeScope,
+  stations,
+  stationsLoading,
 }: {
   open: boolean;
   onClose: () => void;
   onFuel: () => void;
   financeScope: "freight" | "trip";
+  stations: DriverCashEntryStation[];
+  stationsLoading: boolean;
   onSave: (input: {
     category: ExpenseCategory;
     description: string;
     amount: number;
     notes?: string;
+    paymentSource: DriverExpensePaymentSource;
   }) => Promise<void>;
   onSaveEntry: (input: {
-    origin: string;
+    origin?: string;
+    stationPartnerId?: string;
     amount: number;
     notes?: string;
   }) => Promise<void>;
@@ -46,21 +53,33 @@ export function ExpenseSheet({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [entryOrigin, setEntryOrigin] = useState("");
+  const [stationPartnerId, setStationPartnerId] = useState("");
   const [entryAmount, setEntryAmount] = useState("");
   const [entryNotes, setEntryNotes] = useState("");
   const [notes, setNotes] = useState("");
+  const [paymentSource, setPaymentSource] = useState<DriverExpensePaymentSource>(
+    financeScope === "trip" ? "trip_cash" : "company_payable",
+  );
   const [saving, setSaving] = useState(false);
   const scopeLabel = financeScope === "trip" ? "na viagem atual" : "no frete atual";
+
+  useEffect(() => {
+    if (open) {
+      setPaymentSource(financeScope === "trip" ? "trip_cash" : "company_payable");
+    }
+  }, [financeScope, open]);
 
   const resetExpense = () => {
     setDescription("");
     setAmount("");
     setNotes("");
     setCategory("pedagio");
+    setPaymentSource(financeScope === "trip" ? "trip_cash" : "company_payable");
   };
 
   const resetEntry = () => {
     setEntryOrigin("");
+    setStationPartnerId("");
     setEntryAmount("");
     setEntryNotes("");
   };
@@ -79,6 +98,7 @@ export function ExpenseSheet({
         description: description.trim(),
         amount: parsedAmount,
         notes: notes.trim() || undefined,
+        paymentSource: financeScope === "trip" ? paymentSource : "company_payable",
       });
       toast.success("Despesa registrada");
       resetExpense();
@@ -92,15 +112,22 @@ export function ExpenseSheet({
 
   const saveEntry = async () => {
     const parsedAmount = parseMoney(entryAmount);
-    if (!entryOrigin.trim() || !parsedAmount || parsedAmount <= 0) {
-      toast.error("Informe origem e valor da entrada");
+    const hasOrigin =
+      financeScope === "trip" ? Boolean(stationPartnerId) : Boolean(entryOrigin.trim());
+    if (!hasOrigin || !parsedAmount || parsedAmount <= 0) {
+      toast.error(
+        financeScope === "trip"
+          ? "Selecione o posto e informe o valor"
+          : "Informe origem e valor da entrada",
+      );
       return;
     }
 
     setSaving(true);
     try {
       await onSaveEntry({
-        origin: entryOrigin.trim(),
+        origin: financeScope === "trip" ? undefined : entryOrigin.trim(),
+        stationPartnerId: financeScope === "trip" ? stationPartnerId : undefined,
         amount: parsedAmount,
         notes: entryNotes.trim() || undefined,
       });
@@ -136,12 +163,21 @@ export function ExpenseSheet({
       <div className="mt-5 space-y-3">
         {mode === "entry" ? (
           <>
-            <Field
-              label="Origem do dinheiro"
-              placeholder="Ex: adiantamento da central"
-              value={entryOrigin}
-              onChange={setEntryOrigin}
-            />
+            {financeScope === "trip" ? (
+              <StationSelect
+                stations={stations}
+                loading={stationsLoading}
+                value={stationPartnerId}
+                onChange={setStationPartnerId}
+              />
+            ) : (
+              <Field
+                label="Origem do dinheiro"
+                placeholder="Ex: adiantamento da central"
+                value={entryOrigin}
+                onChange={setEntryOrigin}
+              />
+            )}
             <Field
               label="Valor da entrada"
               placeholder="R$ 0,00"
@@ -177,13 +213,22 @@ export function ExpenseSheet({
               value={category}
               onChange={(value) => setCategory(value)}
             />
+            {financeScope === "trip" && (
+              <PaymentSourceControl value={paymentSource} onChange={setPaymentSource} />
+            )}
             <Field
               label="Descricao"
               placeholder={category === "outros" ? "Ex: despesa diversa" : "Ex: pedagio BR-101"}
               value={description}
               onChange={setDescription}
             />
-            <Field label="Valor" placeholder="R$ 0,00" value={amount} onChange={setAmount} numeric />
+            <Field
+              label="Valor"
+              placeholder="R$ 0,00"
+              value={amount}
+              onChange={setAmount}
+              numeric
+            />
             <Field label="Observacoes" placeholder="Opcional" value={notes} onChange={setNotes} />
           </>
         )}
@@ -198,12 +243,87 @@ export function ExpenseSheet({
             )
           }
           onClick={save}
-          disabled={saving}
+          disabled={
+            saving || (mode === "entry" && financeScope === "trip" && stations.length === 0)
+          }
         >
           {saving ? "Salvando..." : mode === "entry" ? "Salvar entrada" : "Salvar despesa"}
         </ActionButton>
       </div>
     </Sheet>
+  );
+}
+
+function StationSelect({
+  stations,
+  loading,
+  value,
+  onChange,
+}: {
+  stations: DriverCashEntryStation[];
+  loading: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block rounded-2xl border border-border bg-surface-2/40 px-4 py-3">
+      <span className="label-xs">Posto onde retirou o dinheiro</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={loading || stations.length === 0}
+        className="mt-1 w-full bg-transparent text-[15px] font-semibold outline-none disabled:text-muted-foreground"
+      >
+        <option value="">
+          {loading
+            ? "Carregando postos..."
+            : stations.length === 0
+              ? "Nenhum posto/fornecedor cadastrado"
+              : "Selecione o posto"}
+        </option>
+        {stations.map((station) => (
+          <option key={station.id} value={station.id} className="bg-background text-foreground">
+            {station.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function PaymentSourceControl({
+  value,
+  onChange,
+}: {
+  value: DriverExpensePaymentSource;
+  onChange: (value: DriverExpensePaymentSource) => void;
+}) {
+  const options: { value: DriverExpensePaymentSource; label: string }[] = [
+    { value: "trip_cash", label: "Saldo da viagem" },
+    { value: "company_payable", label: "A pagar pela JO" },
+  ];
+
+  return (
+    <div>
+      <p className="label-xs mb-2">Forma de pagamento</p>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "rounded-2xl border px-3 py-3 text-left text-[13px] font-bold transition-colors",
+              option.value === value
+                ? "border-primary bg-primary/12 text-primary"
+                : "border-border text-muted-foreground",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
