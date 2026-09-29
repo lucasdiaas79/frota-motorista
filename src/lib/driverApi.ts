@@ -208,6 +208,30 @@ export type DriverTripFinance = {
   transactions: DriverFinanceTransaction[];
 };
 
+export type DriverDailyAllowanceStatus = "submitted" | "approved" | "rejected";
+
+export type DriverDailyAllowance = {
+  id: string;
+  quantity: number;
+  unitAmount: number | string;
+  totalAmount: number | string;
+  status: DriverDailyAllowanceStatus;
+  notes?: string | null;
+  submittedAt: string;
+  reviewNotes?: string | null;
+  reviewedAt?: string | null;
+};
+
+export type DriverDailyAllowanceContext = {
+  enabled: boolean;
+  configured?: boolean;
+  reason?: string;
+  tripCycleId?: string;
+  tripCycleStartedAt?: string;
+  dailyAmount?: number | string;
+  allowance?: DriverDailyAllowance | null;
+};
+
 export type DriverAppContext = {
   driver: DriverRow;
   tenant: DriverTenantInfo | null;
@@ -222,6 +246,7 @@ export type DriverAppContext = {
   documents: DriverDocument[];
   cashEntries?: DriverCashEntry[];
   expenses?: DriverExpenseEntry[];
+  dailyAllowance?: DriverDailyAllowanceContext | null;
 };
 
 export const DEFAULT_DRIVER_APP_CONFIG: DriverAppConfig = {
@@ -350,6 +375,7 @@ function normalizeDriverAppContext(data: unknown): DriverAppContext {
     documents: context.documents ?? [],
     cashEntries: context.cashEntries ?? [],
     expenses: context.expenses ?? [],
+    dailyAllowance: context.dailyAllowance ?? null,
   };
 }
 
@@ -865,6 +891,18 @@ export async function registerDriverCashEntry(input: {
   return normalizeDriverAppContext(data);
 }
 
+export async function submitDriverDailyAllowance(input: {
+  quantity: number;
+  notes?: string;
+}): Promise<DriverDailyAllowanceContext> {
+  const { data, error } = await supabase.rpc("driver_app_submit_daily_allowance", {
+    p_quantity: input.quantity,
+    p_notes: input.notes?.trim() || null,
+  });
+  if (error) throw error;
+  return (data ?? { enabled: false }) as DriverDailyAllowanceContext;
+}
+
 export async function completeDriverPasswordSetup(newPassword: string): Promise<DriverAppContext> {
   const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
   if (passwordError) throw passwordError;
@@ -883,6 +921,11 @@ export function subscribeDriverOperationalChanges(onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_documents" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "fuel_records" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "freight_expenses" }, onChange)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "driver_trip_daily_allowances" },
+      onChange,
+    )
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "freight_cash_entries" },

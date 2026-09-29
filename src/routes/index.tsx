@@ -33,6 +33,7 @@ import {
   signInDriver,
   signOutDriver,
   stageFromContext,
+  submitDriverDailyAllowance,
   subscribeDriverOperationalChanges,
   tripFromContext,
   type DriverAppContext,
@@ -325,6 +326,8 @@ function App() {
           financeScope={context?.config.expenseScope ?? "freight"}
           stations={cashEntryStations}
           stationsLoading={cashEntryStationsLoading}
+          longTripMode={context?.config.driverAppMode === "long_trip_multi_freight"}
+          dailyAllowance={context?.dailyAllowance}
           onFuel={() => {
             setExpenseOpen(false);
             setFuelOpen(true);
@@ -346,6 +349,10 @@ function App() {
                   notes: input.notes,
                 });
             setContext(next);
+          }}
+          onSaveDailyAllowance={async (input) => {
+            const dailyAllowance = await submitDriverDailyAllowance(input);
+            setContext((current) => (current ? { ...current, dailyAllowance } : current));
           }}
         />
 
