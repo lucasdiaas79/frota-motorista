@@ -732,15 +732,31 @@ export async function advanceDriverStage(
   vehicleId: string,
   unloadedTons?: number,
   odometer?: number,
+  targetStage?: VehicleFreightStage | null,
 ): Promise<DriverAppContext> {
-  const { data, error } = await supabase.rpc("driver_app_advance_stage", {
+  const payload = {
     p_vehicle_id: vehicleId,
-    p_target_stage: null,
+    p_target_stage: targetStage ?? null,
     p_unloaded_tons: unloadedTons ?? null,
+  };
+  const { data, error } = await supabase.rpc("driver_app_advance_stage", {
+    ...payload,
     p_odometer: odometer ?? null,
   });
+  if (error && isMissingRpcParameter(error, "p_odometer")) {
+    const fallback = await supabase.rpc("driver_app_advance_stage", payload);
+    if (fallback.error) throw fallback.error;
+    return normalizeDriverAppContext(fallback.data);
+  }
   if (error) throw error;
   return normalizeDriverAppContext(data);
+}
+
+function isMissingRpcParameter(error: unknown, parameter: string) {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { message?: string; details?: string; hint?: string; code?: string };
+  const text = `${record.message ?? ""} ${record.details ?? ""} ${record.hint ?? ""}`;
+  return record.code === "PGRST202" && text.includes(parameter);
 }
 
 export async function completeDriverReturn(

@@ -37,7 +37,9 @@ import {
   subscribeDriverOperationalChanges,
   tripFromContext,
   type DriverAppContext,
+  type DriverAppStageId,
   type DriverCashEntryStation,
+  type VehicleFreightStage,
 } from "@/lib/driverApi";
 
 export const Route = createFileRoute("/")({
@@ -78,6 +80,15 @@ const SUGGESTIONS = [
   "Avisar a central sobre atraso",
   "Como anexar a nota fiscal?",
 ];
+
+const NEXT_STAGE_BY_APP_STAGE: Partial<Record<DriverAppStageId, VehicleFreightStage>> = {
+  demanda: "EM_ROTA_CARREGAR",
+  remetente: "AGUARDANDO_NOTA",
+  carregamento: "NOTA_EM_CONFERENCIA",
+  documentos: "EM_ROTA_ENTREGA",
+  destinatario: "ENTREGUE_AG_FINALIZACAO",
+  descarga: "ENTREGA_FINALIZADA",
+};
 
 function App() {
   const { theme } = useTheme();
@@ -205,7 +216,12 @@ function App() {
       const next =
         stage.id === "retorno"
           ? await completeDriverReturn(trip.vehicleId, odometer)
-          : await advanceDriverStage(trip.vehicleId, unloadedTons, odometer);
+          : await advanceDriverStage(
+              trip.vehicleId,
+              unloadedTons,
+              odometer,
+              NEXT_STAGE_BY_APP_STAGE[stage.id],
+            );
       setContext(next);
       if (stage.id === "retorno") setTab("home");
       toast.success(`${stage.title} confirmado`);
