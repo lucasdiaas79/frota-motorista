@@ -50,8 +50,8 @@ export function LoginScreen({
         <form onSubmit={submit} className="w-full space-y-3">
           <Field
             icon={<Phone className="h-4.5 w-4.5" />}
-            label="Telefone"
-            placeholder="(79) 99999-9999"
+            label="Login"
+            placeholder="79999999999"
             inputMode="tel"
             value={phone}
             onChange={setPhone}

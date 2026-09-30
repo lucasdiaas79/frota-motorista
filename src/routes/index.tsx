@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { Home, Route as RouteIcon, FileText, User, Sparkles } from "lucide-react";
+import { Gauge, Home, Route as RouteIcon, FileText, User, Sparkles } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { HomeScreen } from "@/components/app/HomeScreen";
 import { TripScreen } from "@/components/app/TripScreen";
@@ -63,6 +63,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Tab = "home" | "trip" | "docs" | "profile";
+type PendingOdometerAdvance = { kind: "start" | "end"; unloadedTons?: number } | null;
 
 const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Inicio", icon: Home },
@@ -88,11 +89,14 @@ function App() {
   const [cashEntryStations, setCashEntryStations] = useState<DriverCashEntryStation[]>([]);
   const [cashEntryStationsLoading, setCashEntryStationsLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [pendingOdometerAdvance, setPendingOdometerAdvance] =
+    useState<PendingOdometerAdvance>(null);
   const [context, setContext] = useState<DriverAppContext | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const stage = useMemo(() => stageFromContext(context), [context]);
   const trip = useMemo(() => tripFromContext(context), [context]);
   const finance = useMemo(() => financeFromContext(context), [context]);
+  const longTripMode = context?.config.driverAppMode === "long_trip_multi_freight";
 
   useEffect(() => {
     if (!expenseOpen || context?.config.expenseScope !== "trip") return;
@@ -181,16 +185,27 @@ function App() {
     };
   }, [authenticated, refreshContext]);
 
-  const advance = async (unloadedTons?: number) => {
+  const advance = async (unloadedTons?: number, odometer?: number) => {
     if (!trip.vehicleId || !stage.canDriverAdvance) {
       toast.error("Esta etapa depende da central");
       return;
     }
+
+    if (longTripMode && stage.id === "demanda" && !context?.tripCycle?.startOdometer && !odometer) {
+      setPendingOdometerAdvance({ kind: "start", unloadedTons });
+      return;
+    }
+
+    if (longTripMode && stage.id === "retorno" && !odometer) {
+      setPendingOdometerAdvance({ kind: "end", unloadedTons });
+      return;
+    }
+
     try {
       const next =
         stage.id === "retorno"
-          ? await completeDriverReturn(trip.vehicleId)
-          : await advanceDriverStage(trip.vehicleId, unloadedTons);
+          ? await completeDriverReturn(trip.vehicleId, odometer)
+          : await advanceDriverStage(trip.vehicleId, unloadedTons, odometer);
       setContext(next);
       if (stage.id === "retorno") setTab("home");
       toast.success(`${stage.title} confirmado`);
@@ -356,6 +371,18 @@ function App() {
           }}
         />
 
+        <OdometerSheet
+          open={Boolean(pendingOdometerAdvance)}
+          kind={pendingOdometerAdvance?.kind ?? "start"}
+          startOdometer={context?.tripCycle?.startOdometer}
+          onClose={() => setPendingOdometerAdvance(null)}
+          onConfirm={(odometer) => {
+            const pending = pendingOdometerAdvance;
+            setPendingOdometerAdvance(null);
+            void advance(pending?.unloadedTons, odometer);
+          }}
+        />
+
         <Sheet open={aiOpen} onClose={() => setAiOpen(false)} title="Assistente FrotaK">
           <div className="flex items-start gap-3 rounded-2xl border border-primary/25 bg-primary/8 p-4">
             <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
@@ -424,5 +451,104 @@ function App() {
 
       <Toaster position="top-center" theme={theme} richColors />
     </main>
+  );
+}
+
+function parseDecimal(value: string) {
+  const normalized = value
+    .trim()
+    .replace(/\.(?=\d{3}(,|$))/g, "")
+    .replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toNumber(value?: number | string | null) {
+  if (value == null) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function OdometerSheet({
+  open,
+  kind,
+  startOdometer,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  kind: "start" | "end";
+  startOdometer?: number | string | null;
+  onClose: () => void;
+  onConfirm: (odometer: number) => void;
+}) {
+  const [value, setValue] = useState("");
+  const start = toNumber(startOdometer);
+  const title = kind === "start" ? "Odometro inicial" : "Odometro final";
+  const description =
+    kind === "start"
+      ? "Informe o KM atual antes de iniciar o tiro longo."
+      : "Informe o KM atual ao chegar no patio.";
+
+  useEffect(() => {
+    if (open) setValue("");
+  }, [open]);
+
+  const submit = () => {
+    const odometer = parseDecimal(value);
+    if (!odometer || odometer <= 0) {
+      toast.error("Informe um odometro valido.");
+      return;
+    }
+    if (kind === "end" && start != null && odometer < start) {
+      toast.error("Odometro final nao pode ser menor que o inicial.");
+      return;
+    }
+    onConfirm(odometer);
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose} title={title}>
+      <div className="rounded-3xl border border-primary/20 bg-primary/8 p-4">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-background text-primary">
+          <Gauge className="h-5 w-5" />
+        </span>
+        <p className="mt-3 text-[15px] font-extrabold">{description}</p>
+        {kind === "end" && start != null ? (
+          <p className="mt-1 text-[12px] font-semibold text-muted-foreground">
+            Odometro inicial registrado: {start.toLocaleString("pt-BR")} km
+          </p>
+        ) : null}
+      </div>
+
+      <label className="mt-4 block rounded-2xl border border-border bg-surface-2/40 px-4 py-3">
+        <span className="label-xs">Km atual</span>
+        <input
+          autoFocus
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Ex.: 152000"
+          className="mt-1 w-full bg-transparent text-[18px] font-bold outline-none placeholder:text-muted-foreground/60"
+        />
+      </label>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-2xl border border-border px-4 py-3 text-[14px] font-bold"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={submit}
+          className="rounded-2xl bg-primary px-4 py-3 text-[14px] font-bold text-primary-foreground"
+        >
+          Confirmar
+        </button>
+      </div>
+    </Sheet>
   );
 }

@@ -198,6 +198,10 @@ export type DriverTripCycle = {
   status: "open" | "closed" | "cancelled";
   startedAt: string;
   closedAt?: string | null;
+  startOdometer?: number | string | null;
+  endOdometer?: number | string | null;
+  odometerStartedAt?: string | null;
+  odometerEndedAt?: string | null;
   freightCount?: number;
   completedFreightCount?: number;
 };
@@ -695,19 +699,25 @@ export async function loadDriverContext(): Promise<DriverAppContext> {
 export async function advanceDriverStage(
   vehicleId: string,
   unloadedTons?: number,
+  odometer?: number,
 ): Promise<DriverAppContext> {
   const { data, error } = await supabase.rpc("driver_app_advance_stage", {
     p_vehicle_id: vehicleId,
     p_target_stage: null,
     p_unloaded_tons: unloadedTons ?? null,
+    p_odometer: odometer ?? null,
   });
   if (error) throw error;
   return normalizeDriverAppContext(data);
 }
 
-export async function completeDriverReturn(vehicleId: string): Promise<DriverAppContext> {
+export async function completeDriverReturn(
+  vehicleId: string,
+  odometer?: number,
+): Promise<DriverAppContext> {
   const { data, error } = await supabase.rpc("driver_app_complete_return", {
     p_vehicle_id: vehicleId,
+    p_odometer: odometer ?? null,
   });
   if (error) throw error;
   return normalizeDriverAppContext(data);
