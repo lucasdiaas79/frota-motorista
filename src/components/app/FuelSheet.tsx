@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Camera, CheckCircle2, Clock, Fuel, MapPin, Receipt, ScanLine } from "lucide-react";
 import { toast } from "sonner";
@@ -165,7 +165,7 @@ export function FuelSheet({
             onFile={setPumpPhoto}
           />
           <PhotoTile
-            label="Foto do cupom"
+            label="Foto do comprovante"
             icon={<Receipt className="h-6 w-6" />}
             file={receiptPhoto}
             onFile={setReceiptPhoto}
@@ -404,9 +404,13 @@ function PhotoTile({
   file?: File;
   onFile: (file: File | undefined) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
   return (
-    <motion.label
+    <motion.button
+      type="button"
       whileTap={{ scale: 0.97 }}
+      onClick={() => inputRef.current?.click()}
       className={cn(
         "flex min-h-[112px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-3 py-5 text-center",
         file
@@ -415,15 +419,23 @@ function PhotoTile({
       )}
     >
       <input
-        className="sr-only"
+        ref={inputRef}
+        className="hidden"
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={(event) => onFile(event.currentTarget.files?.[0])}
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+        onChange={(event) => {
+          const selected = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (selected) onFile(selected);
+        }}
       />
       {file ? <CheckCircle2 className="h-6 w-6" /> : icon}
       <span className="max-w-full truncate text-[12px] font-bold">{file ? file.name : label}</span>
-    </motion.label>
+    </motion.button>
   );
 }
 

@@ -1,8 +1,14 @@
 import { motion } from "motion/react";
-import { Download, FileText, Loader2, MapPin, Truck, Upload } from "lucide-react";
+import { Download, Eye, FileText, Loader2, MapPin, Truck, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Row, SectionTitle } from "./primitives";
-import type { DriverDocument, DriverTrip } from "@/lib/driverApi";
+import {
+  createDriverDocumentUrl,
+  driverDocumentFileName,
+  type DriverDocument,
+  type DriverTrip,
+} from "@/lib/driverApi";
+import { useState } from "react";
 
 export function DocsScreen({
   trip,
@@ -13,13 +19,47 @@ export function DocsScreen({
   documents: DriverDocument[];
   onDocument: (kind: string, fileName: string) => Promise<void>;
 }) {
+  const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
   const docs = documents.length
     ? documents.map((document) => ({
-        name: document.file_name,
+        id: document.id,
+        document,
+        name: driverDocumentFileName(document),
         meta: `${document.kind} - ${document.status}`,
         state: "ok" as const,
       }))
     : [{ name: "Nenhum documento anexado", meta: "Aguardando envio", state: "pending" as const }];
+
+  const openDocument = async (document: DriverDocument) => {
+    setLoadingDocumentId(document.id);
+    try {
+      const url = await createDriverDocumentUrl(document);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.assign(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel abrir o documento");
+    } finally {
+      setLoadingDocumentId(null);
+    }
+  };
+
+  const downloadDocument = async (document: DriverDocument) => {
+    setLoadingDocumentId(document.id);
+    try {
+      const url = await createDriverDocumentUrl(document);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = driverDocumentFileName(document);
+      link.rel = "noreferrer";
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel baixar o documento");
+    } finally {
+      setLoadingDocumentId(null);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pt-4 pb-6">
@@ -92,14 +132,31 @@ export function DocsScreen({
                 <span className="block truncate text-[14px] font-bold">{d.name}</span>
                 <span className="block text-xs text-muted-foreground">{d.meta}</span>
               </span>
-              {d.state === "ok" ? (
-                <button
-                  onClick={() => toast.success(`${d.name} baixado`)}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary"
-                  aria-label="Baixar"
-                >
-                  <Download className="h-4.5 w-4.5" />
-                </button>
+              {d.state === "ok" && "document" in d ? (
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void openDocument(d.document)}
+                    disabled={loadingDocumentId === d.id}
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-primary/12 text-primary disabled:opacity-60"
+                    aria-label="Visualizar"
+                  >
+                    {loadingDocumentId === d.id ? (
+                      <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                    ) : (
+                      <Eye className="h-4.5 w-4.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void downloadDocument(d.document)}
+                    disabled={loadingDocumentId === d.id}
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-primary/12 text-primary disabled:opacity-60"
+                    aria-label="Baixar"
+                  >
+                    <Download className="h-4.5 w-4.5" />
+                  </button>
+                </span>
               ) : (
                 <Loader2 className="h-5 w-5 shrink-0 animate-spin text-warning" />
               )}

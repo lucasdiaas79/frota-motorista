@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Camera,
+  Download,
+  Eye,
   FileText,
   Fuel,
   History,
@@ -17,6 +19,8 @@ import { Sheet } from "./Sheet";
 import { ActionButton, Chip, SectionTitle } from "./primitives";
 import {
   DRIVER_STAGE_COUNT,
+  createDriverDocumentUrl,
+  driverDocumentFileName,
   type DriverAppStage,
   type DriverDocument,
   type DriverTrip,
@@ -42,6 +46,7 @@ export function TripScreen({
   const [noteSent, setNoteSent] = useState(false);
   const [receipt, setReceipt] = useState(false);
   const [sendingNote, setSendingNote] = useState(false);
+  const [openingCte, setOpeningCte] = useState<"view" | "download" | null>(null);
   const [unloadedTons, setUnloadedTons] = useState("");
   const noteInputRef = useRef<HTMLInputElement | null>(null);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
@@ -66,6 +71,39 @@ export function TripScreen({
     [documents],
   );
   const hasCteDocument = Boolean(cteDocument);
+
+  const openCteDocument = async () => {
+    if (!cteDocument) return;
+    setOpeningCte("view");
+    try {
+      const url = await createDriverDocumentUrl(cteDocument);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.assign(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel abrir o CT-e");
+    } finally {
+      setOpeningCte(null);
+    }
+  };
+
+  const downloadCteDocument = async () => {
+    if (!cteDocument) return;
+    setOpeningCte("download");
+    try {
+      const url = await createDriverDocumentUrl(cteDocument);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = driverDocumentFileName(cteDocument);
+      link.rel = "noreferrer";
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel baixar o CT-e");
+    } finally {
+      setOpeningCte(null);
+    }
+  };
 
   useEffect(() => {
     if (stage.id !== "carregamento") setNoteSent(false);
@@ -243,15 +281,42 @@ export function TripScreen({
                         <FileText className="h-5 w-5" />
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-[14px] font-bold">{cteDocument?.file_name}</p>
+                        <p className="truncate text-[14px] font-bold">
+                          {cteDocument ? driverDocumentFileName(cteDocument) : "CT-e"}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Documento enviado pela expedicao
                         </p>
                       </div>
                     </div>
-                    <p className="rounded-2xl bg-background/60 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
-                      Abra a aba Docs para consultar os arquivos do frete.
-                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void openCteDocument()}
+                        disabled={openingCte !== null}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-primary/12 px-3 text-[12px] font-bold text-primary disabled:opacity-60"
+                      >
+                        {openingCte === "view" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        Visualizar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void downloadCteDocument()}
+                        disabled={openingCte !== null}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-primary/12 px-3 text-[12px] font-bold text-primary disabled:opacity-60"
+                      >
+                        {openingCte === "download" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                        Baixar
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

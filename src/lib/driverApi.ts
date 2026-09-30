@@ -148,8 +148,18 @@ export type DriverDocument = {
   id: string;
   kind: string;
   file_name: string;
+  fileName?: string | null;
+  storage_bucket?: string | null;
+  storageBucket?: string | null;
+  storage_path?: string | null;
+  storagePath?: string | null;
+  mime_type?: string | null;
+  mimeType?: string | null;
+  size_bytes?: number | string | null;
+  sizeBytes?: number | string | null;
   status: string;
   created_at: string;
+  createdAt?: string | null;
 };
 
 export type DriverCashEntry = {
@@ -377,6 +387,29 @@ function normalizeDriverAppContext(data: unknown): DriverAppContext {
     expenses: context.expenses ?? [],
     dailyAllowance: context.dailyAllowance ?? null,
   };
+}
+
+export function driverDocumentFileName(document: DriverDocument) {
+  return document.fileName || document.file_name || "documento";
+}
+
+export function driverDocumentStorageRef(document: DriverDocument) {
+  const bucket = document.storageBucket || document.storage_bucket || null;
+  const path = document.storagePath || document.storage_path || null;
+  return bucket && path ? { bucket, path } : null;
+}
+
+export async function createDriverDocumentUrl(document: DriverDocument) {
+  const ref = driverDocumentStorageRef(document);
+  if (!ref) {
+    throw new Error("Arquivo ainda nao esta disponivel para visualizacao.");
+  }
+
+  const { data, error } = await supabase.storage.from(ref.bucket).createSignedUrl(ref.path, 60 * 10);
+  if (error || !data?.signedUrl) {
+    throw error ?? new Error("Nao foi possivel gerar o link do documento.");
+  }
+  return data.signedUrl;
 }
 
 export function tripFromContext(context: DriverAppContext | null): DriverTrip {
