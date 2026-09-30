@@ -206,6 +206,15 @@ export type DriverTripCycle = {
   completedFreightCount?: number;
 };
 
+export type DriverReturnToYard = {
+  available: boolean;
+  vehicleId?: string;
+  tripCycleId?: string;
+  status?: string;
+  freightStage?: string;
+  label?: string;
+};
+
 export type DriverFinanceTransaction = {
   id: string;
   kind: "entry" | "expense";
@@ -261,6 +270,7 @@ export type DriverAppContext = {
   cashEntries?: DriverCashEntry[];
   expenses?: DriverExpenseEntry[];
   dailyAllowance?: DriverDailyAllowanceContext | null;
+  returnToYard?: DriverReturnToYard | null;
 };
 
 export const DEFAULT_DRIVER_APP_CONFIG: DriverAppConfig = {
@@ -390,6 +400,7 @@ function normalizeDriverAppContext(data: unknown): DriverAppContext {
     cashEntries: context.cashEntries ?? [],
     expenses: context.expenses ?? [],
     dailyAllowance: context.dailyAllowance ?? null,
+    returnToYard: context.returnToYard ?? null,
   };
 }
 
@@ -504,6 +515,27 @@ export function stageFromContext(context: DriverAppContext | null): DriverAppSta
     context?.tripCycle?.status === "open";
   const latestNote = latestDocument(context?.documents ?? [], "nota_fiscal");
   const noteRejected = isRejected(latestNote?.status);
+
+  if (
+    vehicle &&
+    longTripOpen &&
+    context?.returnToYard?.available &&
+    vehicle.status === "rota-retornando" &&
+    vehicle.freight_stage === "ENTREGA_FINALIZADA"
+  ) {
+    return {
+      id: "retorno",
+      index: STAGE_INDEX.retorno,
+      short: "Retorno",
+      title: "Retorno ao patio",
+      subtitle: "Confirme sua chegada ao patio para liberar o veiculo.",
+      statusLabel: "Retornando",
+      action: context.returnToYard.label || "Cheguei no patio",
+      place: currentPlace || "Patio",
+      eta: "-",
+      canDriverAdvance: true,
+    };
+  }
 
   if (!vehicle || !currentFreightId) {
     return {
