@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { Gauge, Home, Route as RouteIcon, FileText, User, Sparkles } from "lucide-react";
@@ -34,6 +34,7 @@ import {
   signOutDriver,
   stageFromContext,
   submitDriverDailyAllowance,
+  subscribeDriverAuthChanges,
   subscribeDriverOperationalChanges,
   tripFromContext,
   type DriverAppContext,
@@ -104,6 +105,7 @@ function App() {
     useState<PendingOdometerAdvance>(null);
   const [context, setContext] = useState<DriverAppContext | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const contextRequestId = useRef(0);
   const stage = useMemo(() => stageFromContext(context), [context]);
   const trip = useMemo(() => tripFromContext(context), [context]);
   const finance = useMemo(() => financeFromContext(context), [context]);
@@ -132,10 +134,21 @@ function App() {
     };
   }, [expenseOpen, context?.config.expenseScope]);
 
-  const refreshContext = useCallback(async () => {
-    const next = await loadDriverContext();
+  const applyAuthoritativeContext = useCallback((next: DriverAppContext) => {
+    contextRequestId.current += 1;
     setContext(next);
     setLoadError(null);
+    return next;
+  }, []);
+
+  const refreshContext = useCallback(async () => {
+    const requestId = contextRequestId.current + 1;
+    contextRequestId.current = requestId;
+    const next = await loadDriverContext();
+    if (contextRequestId.current === requestId) {
+      setContext(next);
+      setLoadError(null);
+    }
     return next;
   }, []);
 
@@ -164,12 +177,31 @@ function App() {
     };
   }, [refreshContext]);
 
-  useEffect(() => {
-    if (!authenticated) return;
+  useEffect(
+    () =>
+      subscribeDriverAuthChanges(() => {
+        contextRequestId.current += 1;
+        setAuthenticated(false);
+        setContext(null);
+        setTab("home");
+      }),
+    [],
+  );
 
+  useEffect(() => {
+    const driverId = context?.driver.id;
+    const tenantId = context?.driver.tenant_id;
+    if (!authenticated || !driverId || !tenantId) return;
+
+    let disposed = false;
     let refreshing = false;
+    let refreshQueued = false;
     const refreshSafely = () => {
-      if (refreshing) return;
+      if (disposed) return;
+      if (refreshing) {
+        refreshQueued = true;
+        return;
+      }
       refreshing = true;
       void refreshContext()
         .catch((error) => {
@@ -177,24 +209,56 @@ function App() {
         })
         .finally(() => {
           refreshing = false;
+          if (refreshQueued && !disposed) {
+            refreshQueued = false;
+            queueMicrotask(refreshSafely);
+          }
         });
     };
 
-    const unsubscribe = subscribeDriverOperationalChanges(() => {
-      refreshSafely();
-    });
+    let subscribedOnce = false;
+    const unsubscribe = subscribeDriverOperationalChanges(
+      {
+        tenantId,
+        driverId,
+        vehicleId: context.vehicle?.id,
+        freightId: context.vehicle?.current_freight_id,
+        tripCycleId: context.tripCycle?.id,
+      },
+      refreshSafely,
+      (status) => {
+        if (status === "SUBSCRIBED") {
+          if (subscribedOnce) refreshSafely();
+          subscribedOnce = true;
+          return;
+        }
+        if (document.visibilityState !== "hidden") refreshSafely();
+      },
+    );
 
     const interval = window.setInterval(refreshSafely, 10000);
     window.addEventListener("focus", refreshSafely);
-    document.addEventListener("visibilitychange", refreshSafely);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== "hidden") refreshSafely();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
+      disposed = true;
       unsubscribe();
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshSafely);
-      document.removeEventListener("visibilitychange", refreshSafely);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [authenticated, refreshContext]);
+  }, [
+    authenticated,
+    context?.driver.id,
+    context?.driver.tenant_id,
+    context?.tripCycle?.id,
+    context?.vehicle?.current_freight_id,
+    context?.vehicle?.id,
+    refreshContext,
+  ]);
 
   const advance = async (unloadedTons?: number, odometer?: number) => {
     if (!trip.vehicleId || !stage.canDriverAdvance) {
@@ -222,7 +286,7 @@ function App() {
               odometer,
               NEXT_STAGE_BY_APP_STAGE[stage.id],
             );
-      setContext(next);
+      applyAuthoritativeContext(next);
       if (stage.id === "retorno") setTab("home");
       toast.success(`${stage.title} confirmado`);
     } catch (error) {
@@ -267,7 +331,7 @@ function App() {
           driverName={context.driver.name}
           onComplete={async (password) => {
             const next = await completeDriverPasswordSetup(password);
-            setContext(next);
+            applyAuthoritativeContext(next);
             setTab("home");
           }}
         />
@@ -309,7 +373,7 @@ function App() {
                 onAdvance={(unloadedTons) => void advance(unloadedTons)}
                 onDocument={async (kind, fileName, file) => {
                   const next = await registerDriverDocument({ kind, fileName, file });
-                  setContext(next);
+                  applyAuthoritativeContext(next);
                 }}
                 onFuel={() => setExpenseOpen(true)}
               />
@@ -320,7 +384,7 @@ function App() {
                 documents={context?.documents ?? []}
                 onDocument={async (kind, fileName) => {
                   const next = await registerDriverDocument({ kind, fileName });
-                  setContext(next);
+                  applyAuthoritativeContext(next);
                 }}
               />
             )}
@@ -347,7 +411,7 @@ function App() {
               ...input,
               tenantId: context?.driver.tenant_id,
             });
-            setContext(next);
+            applyAuthoritativeContext(next);
           }}
         />
 
@@ -365,7 +429,7 @@ function App() {
           }}
           onSave={async (input) => {
             const next = await registerDriverExpense(input);
-            setContext(next);
+            applyAuthoritativeContext(next);
           }}
           onSaveEntry={async (input) => {
             const next = input.stationPartnerId
@@ -379,10 +443,11 @@ function App() {
                   amount: input.amount,
                   notes: input.notes,
                 });
-            setContext(next);
+            applyAuthoritativeContext(next);
           }}
           onSaveDailyAllowance={async (input) => {
             const dailyAllowance = await submitDriverDailyAllowance(input);
+            contextRequestId.current += 1;
             setContext((current) => (current ? { ...current, dailyAllowance } : current));
           }}
         />

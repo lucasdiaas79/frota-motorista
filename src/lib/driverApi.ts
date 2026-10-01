@@ -420,7 +420,9 @@ export async function createDriverDocumentUrl(document: DriverDocument) {
     throw new Error("Arquivo ainda nao esta disponivel para visualizacao.");
   }
 
-  const { data, error } = await supabase.storage.from(ref.bucket).createSignedUrl(ref.path, 60 * 10);
+  const { data, error } = await supabase.storage
+    .from(ref.bucket)
+    .createSignedUrl(ref.path, 60 * 10);
   if (error || !data?.signedUrl) {
     throw error ?? new Error("Nao foi possivel gerar o link do documento.");
   }
@@ -744,9 +746,9 @@ export async function advanceDriverStage(
     p_odometer: odometer ?? null,
   });
   if (error && isMissingRpcParameter(error, "p_odometer")) {
-    const fallback = await supabase.rpc("driver_app_advance_stage", payload);
-    if (fallback.error) throw fallback.error;
-    return normalizeDriverAppContext(fallback.data);
+    throw new Error(
+      "O banco ainda nao recebeu a versao obrigatoria do odometro. Atualize o backend antes de avancar a viagem.",
+    );
   }
   if (error) throw error;
   return normalizeDriverAppContext(data);
@@ -767,6 +769,11 @@ export async function completeDriverReturn(
     p_vehicle_id: vehicleId,
     p_odometer: odometer ?? null,
   });
+  if (error && isMissingRpcParameter(error, "p_odometer")) {
+    throw new Error(
+      "O banco ainda nao recebeu a versao obrigatoria do odometro. Atualize o backend antes de concluir o retorno.",
+    );
+  }
   if (error) throw error;
   return normalizeDriverAppContext(data);
 }
@@ -1003,28 +1010,88 @@ export async function completeDriverPasswordSetup(newPassword: string): Promise<
   return normalizeDriverAppContext(data);
 }
 
-export function subscribeDriverOperationalChanges(onChange: () => void) {
+export type DriverRealtimeStatus = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR";
+
+export type DriverOperationalSubscription = {
+  tenantId: string;
+  driverId: string;
+  vehicleId?: string | null;
+  freightId?: string | null;
+  tripCycleId?: string | null;
+};
+
+export function subscribeDriverOperationalChanges(
+  scope: DriverOperationalSubscription,
+  onChange: () => void,
+  onStatus?: (status: DriverRealtimeStatus) => void,
+) {
+  const tenantFilter = `tenant_id=eq.${scope.tenantId}`;
+  const driverFilter = `driver_id=eq.${scope.driverId}`;
+  const vehicleFilter = scope.vehicleId ? `id=eq.${scope.vehicleId}` : tenantFilter;
+  const freightFilter = scope.freightId ? `freight_id=eq.${scope.freightId}` : tenantFilter;
+  const tripCycleFilter = scope.tripCycleId ? `id=eq.${scope.tripCycleId}` : driverFilter;
   const channel = supabase
-    .channel("driver-app-operational-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "vehicles" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "freights" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "driver_trip_cycles" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "freight_documents" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "fuel_records" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "freight_expenses" }, onChange)
+    .channel(`driver-app-operational-changes:${scope.driverId}`)
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "driver_trip_daily_allowances" },
+      { event: "*", schema: "public", table: "drivers", filter: `id=eq.${scope.driverId}` },
       onChange,
     )
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "freight_cash_entries" },
+      { event: "*", schema: "public", table: "vehicles", filter: vehicleFilter },
       onChange,
     )
-    .subscribe();
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "freights", filter: tenantFilter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "driver_trip_cycles", filter: tripCycleFilter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "freight_documents", filter: freightFilter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "fuel_records", filter: driverFilter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "freight_expenses", filter: driverFilter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "driver_trip_daily_allowances",
+        filter: driverFilter,
+      },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "freight_cash_entries", filter: driverFilter },
+      onChange,
+    )
+    .subscribe((status) => onStatus?.(status));
 
   return () => {
     void supabase.removeChannel(channel);
   };
+}
+
+export function subscribeDriverAuthChanges(onSignedOut: () => void) {
+  const { data } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") onSignedOut();
+  });
+  return () => data.subscription.unsubscribe();
 }
