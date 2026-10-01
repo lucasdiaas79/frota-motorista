@@ -429,6 +429,30 @@ export async function createDriverDocumentUrl(document: DriverDocument) {
   return data.signedUrl;
 }
 
+export async function downloadDriverDocument(document: DriverDocument) {
+  const ref = driverDocumentStorageRef(document);
+  if (!ref) {
+    throw new Error("Arquivo ainda nao esta disponivel para download.");
+  }
+
+  const { data, error } = await supabase.storage.from(ref.bucket).download(ref.path);
+  if (error || !data) {
+    throw error ?? new Error("Nao foi possivel baixar o documento.");
+  }
+
+  const objectUrl = URL.createObjectURL(data);
+  try {
+    const link = window.document.createElement("a");
+    link.href = objectUrl;
+    link.download = driverDocumentFileName(document);
+    window.document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+}
+
 export function tripFromContext(context: DriverAppContext | null): DriverTrip {
   if (!context?.vehicle) {
     return { ...FALLBACK_TRIP, driver: context?.driver.name ?? "-" };

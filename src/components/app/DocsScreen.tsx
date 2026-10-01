@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Row, SectionTitle } from "./primitives";
 import {
   createDriverDocumentUrl,
+  downloadDriverDocument,
   driverDocumentFileName,
   type DriverDocument,
   type DriverTrip,
@@ -46,14 +47,7 @@ export function DocsScreen({
   const downloadDocument = async (document: DriverDocument) => {
     setLoadingDocumentId(document.id);
     try {
-      const url = await createDriverDocumentUrl(document);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = driverDocumentFileName(document);
-      link.rel = "noreferrer";
-      window.document.body.appendChild(link);
-      link.click();
-      link.remove();
+      await downloadDriverDocument(document);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel baixar o documento");
     } finally {

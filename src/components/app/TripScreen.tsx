@@ -20,6 +20,7 @@ import { ActionButton, Chip, SectionTitle } from "./primitives";
 import {
   DRIVER_STAGE_COUNT,
   createDriverDocumentUrl,
+  downloadDriverDocument,
   driverDocumentFileName,
   type DriverAppStage,
   type DriverDocument,
@@ -90,14 +91,7 @@ export function TripScreen({
     if (!cteDocument) return;
     setOpeningCte("download");
     try {
-      const url = await createDriverDocumentUrl(cteDocument);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = driverDocumentFileName(cteDocument);
-      link.rel = "noreferrer";
-      window.document.body.appendChild(link);
-      link.click();
-      link.remove();
+      await downloadDriverDocument(cteDocument);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel baixar o CT-e");
     } finally {
