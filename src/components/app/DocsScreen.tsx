@@ -28,7 +28,9 @@ export function DocsScreen({
         name: driverDocumentFileName(document),
         meta:
           document.kind === "anexo_frete"
-            ? "Anexado pela central"
+            ? document.tripSequence
+              ? `Anexado pela central · Frete ${document.tripSequence}`
+              : "Anexado pela central"
             : `${document.kind} - ${document.status}`,
         state: "ok" as const,
       }))
@@ -118,7 +120,7 @@ export function DocsScreen({
         <div className="space-y-2">
           {docs.map((d) => (
             <motion.div
-              key={d.name}
+              key={"id" in d && d.id ? d.id : d.name}
               whileTap={{ scale: 0.99 }}
               className="flex items-center gap-3 rounded-2xl border border-border bg-surface-2/40 p-3"
             >

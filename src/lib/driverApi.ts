@@ -160,6 +160,8 @@ export type DriverDocument = {
   status: string;
   created_at: string;
   createdAt?: string | null;
+  tripSequence?: number | null;
+  isCurrentFreight?: boolean | null;
 };
 
 export type DriverCashEntry = {
