@@ -26,7 +26,10 @@ export function DocsScreen({
         id: document.id,
         document,
         name: driverDocumentFileName(document),
-        meta: `${document.kind} - ${document.status}`,
+        meta:
+          document.kind === "anexo_frete"
+            ? "Anexado pela central"
+            : `${document.kind} - ${document.status}`,
         state: "ok" as const,
       }))
     : [{ name: "Nenhum documento anexado", meta: "Aguardando envio", state: "pending" as const }];
