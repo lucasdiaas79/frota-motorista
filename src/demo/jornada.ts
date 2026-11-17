@@ -81,8 +81,19 @@ export function currentSegment(day?: WorkDay) {
   return last && !last.endAt ? last : undefined;
 }
 
-export function summarize(day: WorkDay | undefined, previousDayEndedAt: string | undefined, now = Date.now()): JornadaSummary {
-  const totals = { direcao: 0, espera: 0, carga_descarga: 0, refeicao: 0, descanso: 0, trabalho: 0 };
+export function summarize(
+  day: WorkDay | undefined,
+  previousDayEndedAt: string | undefined,
+  now = Date.now(),
+): JornadaSummary {
+  const totals = {
+    direcao: 0,
+    espera: 0,
+    carga_descarga: 0,
+    refeicao: 0,
+    descanso: 0,
+    trabalho: 0,
+  };
   if (!day || !day.startedAt) {
     return {
       current: "fora",
@@ -116,7 +127,9 @@ export function summarize(day: WorkDay | undefined, previousDayEndedAt: string |
   );
   const extraMin = Math.max(0, workedMin - RULES.normalDayMin);
   const current = day.endedAt ? "fora" : (currentSegment(day)?.activity ?? "trabalho");
-  const mealDone = day.segments.some((s) => s.activity === "refeicao" && segmentMinutes(s, now) >= RULES.minMealMin);
+  const mealDone = day.segments.some(
+    (s) => s.activity === "refeicao" && segmentMinutes(s, now) >= RULES.minMealMin,
+  );
 
   const alerts: JornadaAlert[] = [];
   let interDayMin: number | undefined;

@@ -17,7 +17,12 @@ export function captureGeo(fallback: { lat: number; lng: number }): Promise<GeoP
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         window.clearTimeout(timer);
-        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: "gps" });
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          source: "gps",
+        });
       },
       () => {
         window.clearTimeout(timer);

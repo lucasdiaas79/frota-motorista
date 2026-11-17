@@ -1,13 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Ban, Check, Fuel, Gauge, MapPin, ScanLine, Sparkles, Star } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  Check,
+  Fuel,
+  Gauge,
+  MapPin,
+  ScanLine,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addFuel, useDemo, getState } from "../store";
 import { PAYMENT_LABEL, fullToFull, lastRecord, nearestStations, validateFuel } from "../fuel";
 import { captureGeo } from "../geo";
 import { CDD } from "../seed";
 import type { FuelPayment, GeoPoint } from "../types";
-import { BigButton, Field, Pill, PhotoSlot, Segmented, Stat, TextInput, Toggle, dayLabel, money, num, parseNum } from "./kit";
+import {
+  BigButton,
+  Field,
+  Pill,
+  PhotoSlot,
+  Segmented,
+  Stat,
+  TextArea,
+  TextInput,
+  Toggle,
+  dayLabel,
+  money,
+  num,
+  parseNum,
+} from "./kit";
 
 export function FuelHistoryPage({ onNew }: { onNew: () => void }) {
   const records = useDemo((s) => s.fuelRecords);
@@ -17,14 +41,30 @@ export function FuelHistoryPage({ onNew }: { onNew: () => void }) {
   const intervals = ftf.intervals.slice(-8);
   const max = Math.max(vehicle.kmPerLiterTarget * 1.2, ...intervals.map((i) => i.kmPerLiter));
   const month = records.filter((r) => Date.now() - new Date(r.at).getTime() < 30 * 86_400_000);
-  const spent = month.reduce((s, r) => s + r.dieselLiters * r.dieselPrice + r.arlaLiters * r.arlaPrice, 0);
+  const spent = month.reduce(
+    (s, r) => s + r.dieselLiters * r.dieselPrice + r.arlaLiters * r.arlaPrice,
+    0,
+  );
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Media" value={ftf.average ? num(ftf.average, 2) : "--"} sub="km/l tanque cheio" tone={ftf.average && ftf.average < vehicle.kmPerLiterTarget ? "warning" : "primary"} />
-        <Stat label="Meta" value={num(vehicle.kmPerLiterTarget, 1)} sub={vehicle.model.split(" ").slice(0, 2).join(" ")} />
-        <Stat label="30 dias" value={money(spent).replace(",00", "")} sub={`${month.length} abastecimentos`} />
+        <Stat
+          label="Media"
+          value={ftf.average ? num(ftf.average, 2) : "--"}
+          sub="km/l tanque cheio"
+          tone={ftf.average && ftf.average < vehicle.kmPerLiterTarget ? "warning" : "primary"}
+        />
+        <Stat
+          label="Meta"
+          value={num(vehicle.kmPerLiterTarget, 1)}
+          sub={vehicle.model.split(" ").slice(0, 2).join(" ")}
+        />
+        <Stat
+          label="30 dias"
+          value={money(spent).replace(",00", "")}
+          sub={`${month.length} abastecimentos`}
+        />
       </div>
 
       <div className="surface-card rounded-[22px] p-4">
@@ -34,16 +74,24 @@ export function FuelHistoryPage({ onNew }: { onNew: () => void }) {
             const below = i.kmPerLiter < vehicle.kmPerLiterTarget;
             return (
               <div key={i.to.id} className="flex flex-1 flex-col items-center gap-1">
-                <span className="text-[9.5px] font-extrabold text-muted-foreground">{num(i.kmPerLiter, 1)}</span>
-                <div className={cn("w-full rounded-t-lg", below ? "bg-warning/70" : "bg-primary/80")} style={{ height: `${(i.kmPerLiter / max) * 100}%` }} />
-                <span className="text-[9px] text-muted-foreground">{new Date(i.to.at).getDate()}</span>
+                <span className="text-[9.5px] font-extrabold text-muted-foreground">
+                  {num(i.kmPerLiter, 1)}
+                </span>
+                <div
+                  className={cn("w-full rounded-t-lg", below ? "bg-warning/70" : "bg-primary/80")}
+                  style={{ height: `${(i.kmPerLiter / max) * 100}%` }}
+                />
+                <span className="text-[9px] text-muted-foreground">
+                  {new Date(i.to.at).getDate()}
+                </span>
               </div>
             );
           })}
         </div>
         <div className="relative mt-1 h-px bg-border" />
         <p className="mt-2 text-[11.5px] text-muted-foreground">
-          Barras amarelas ficaram abaixo da meta. Abastecimento parcial nao distorce: os litros entram no trecho seguinte.
+          Barras amarelas ficaram abaixo da meta. Abastecimento parcial nao distorce: os litros
+          entram no trecho seguinte.
         </p>
       </div>
 
@@ -62,12 +110,18 @@ export function FuelHistoryPage({ onNew }: { onNew: () => void }) {
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-display text-[15px] font-extrabold">{num(r.dieselLiters, 1)} L</p>
+                <p className="font-display text-[15px] font-extrabold">
+                  {num(r.dieselLiters, 1)} L
+                </p>
                 <p className="text-[11px] text-muted-foreground">R$ {r.dieselPrice.toFixed(2)}/L</p>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {r.tankFull ? <Pill tone="primary">Tanque cheio</Pill> : <Pill tone="warning">Parcial</Pill>}
+              {r.tankFull ? (
+                <Pill tone="primary">Tanque cheio</Pill>
+              ) : (
+                <Pill tone="warning">Parcial</Pill>
+              )}
               {r.arlaLiters ? <Pill>ARLA {num(r.arlaLiters, 1)} L</Pill> : null}
               {r.readBy === "leitura_automatica" ? (
                 <Pill tone="info">
@@ -100,6 +154,10 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
   const [tankFull, setTankFull] = useState(true);
   const [payment, setPayment] = useState<FuelPayment>("a_prazo_posto");
   const [photos, setPhotos] = useState({ pump: false, receipt: false, panel: false });
+  const [photoPaths, setPhotoPaths] = useState<{ pump?: string; receipt?: string; panel?: string }>(
+    {},
+  );
+  const [justification, setJustification] = useState("");
   const [reading, setReading] = useState(false);
   const [readBy, setReadBy] = useState<"manual" | "leitura_automatica">("manual");
 
@@ -141,7 +199,8 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
     setPhotos((p) => ({ ...p, receipt: true, pump: true }));
     window.setTimeout(() => {
       const km = state.sim.trackerKmSinceLastFuel || 180;
-      const l = Math.round((km / state.vehicle.kmPerLiterTarget) * (0.95 + Math.random() * 0.1) * 10) / 10;
+      const l =
+        Math.round((km / state.vehicle.kmPerLiterTarget) * (0.95 + Math.random() * 0.1) * 10) / 10;
       setLiters(String(l).replace(".", ","));
       setPrice(station.negotiatedDieselPrice.toFixed(2).replace(".", ","));
       setArla(String(Math.round(l * 0.045 * 10) / 10).replace(".", ","));
@@ -149,7 +208,9 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
       if (!odo && last) setOdo(String(last.odometer + km));
       setReading(false);
       setReadBy("leitura_automatica");
-      toast.success("Cupom lido", { description: "Litros, preco e ARLA preenchidos. Confira antes de salvar." });
+      toast.success("Cupom lido", {
+        description: "Litros, preco e ARLA preenchidos. Confira antes de salvar.",
+      });
     }, 1400);
   };
 
@@ -160,6 +221,12 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
     }
     if (blocked) {
       toast.error("Corrija os itens em vermelho antes de salvar");
+      return;
+    }
+    if (alerts.length && !justification.trim()) {
+      toast.error("Explique o alerta antes de salvar", {
+        description: "A central confere e aprova.",
+      });
       return;
     }
     if (!photos.receipt) {
@@ -179,6 +246,8 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
       tankFull,
       payment,
       photos,
+      ...(Object.keys(photoPaths).length ? { photoPaths } : {}),
+      ...(justification.trim() ? { justification: justification.trim() } : {}),
       readBy,
       ...(geo ? { geo } : {}),
       alerts,
@@ -186,25 +255,40 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
     const after = fullToFull(getState().fuelRecords).intervals.at(-1);
     onDone();
     toast.success("Abastecimento salvo", {
-      description: tankFull && after && after.to.odometer === input.odometer ? `Este trecho: ${num(after.kmPerLiter, 2)} km/l (meta ${num(state.vehicle.kmPerLiterTarget, 1)})` : "Parcial: o km/l sai no proximo tanque cheio",
+      description:
+        tankFull && after && after.to.odometer === input.odometer
+          ? `Este trecho: ${num(after.kmPerLiter, 2)} km/l (meta ${num(state.vehicle.kmPerLiterTarget, 1)})`
+          : "Parcial: o km/l sai no proximo tanque cheio",
     });
   };
 
   return (
     <div className="space-y-3.5">
-      <Field label="Posto" hint={geo ? "Ordenados pelo mais perto de voce" : "Buscando sua posicao..."}>
+      <Field
+        label="Posto"
+        hint={geo ? "Ordenados pelo mais perto de voce" : "Buscando sua posicao..."}
+      >
         <div className="space-y-1.5">
           {stations.map(({ station: s, km }) => (
             <button
               key={s.id}
               onClick={() => setStationId(s.id)}
-              className={cn("flex w-full items-center gap-3 rounded-2xl border p-3 text-left", stationId === s.id ? "border-primary bg-primary/8" : "border-border")}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-2xl border p-3 text-left",
+                stationId === s.id ? "border-primary bg-primary/8" : "border-border",
+              )}
             >
-              <MapPin className={cn("h-5 w-5 shrink-0", stationId === s.id ? "text-primary" : "text-muted-foreground")} />
+              <MapPin
+                className={cn(
+                  "h-5 w-5 shrink-0",
+                  stationId === s.id ? "text-primary" : "text-muted-foreground",
+                )}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13.5px] font-extrabold">{s.name}</span>
                 <span className="block text-[11.5px] text-muted-foreground">
-                  {km != null ? `${num(km, 1)} km - ` : ""}diesel combinado R$ {s.negotiatedDieselPrice.toFixed(2)} - {s.paymentTerms}
+                  {km != null ? `${num(km, 1)} km - ` : ""}diesel combinado R${" "}
+                  {s.negotiatedDieselPrice.toFixed(2)} - {s.paymentTerms}
                 </span>
               </span>
               {s.accredited ? <Star className="h-4 w-4 text-warning" /> : null}
@@ -221,19 +305,63 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
           <ScanLine className={cn("h-5 w-5", reading && "animate-pulse")} />
         </span>
         <span className="flex-1">
-          <span className="block text-[14px] font-extrabold">{reading ? "Lendo o cupom..." : "Fotografar cupom e preencher sozinho"}</span>
-          <span className="block text-[11.5px] text-muted-foreground">Leitura por IA (simulada nesta versao)</span>
+          <span className="block text-[14px] font-extrabold">
+            {reading ? "Lendo o cupom..." : "Fotografar cupom e preencher sozinho"}
+          </span>
+          <span className="block text-[11.5px] text-muted-foreground">
+            Leitura por IA (simulada nesta versao)
+          </span>
         </span>
       </button>
 
       <div className="grid grid-cols-3 gap-2">
-        <PhotoSlot label="Bomba" taken={photos.pump} onTaken={() => setPhotos((p) => ({ ...p, pump: true }))} compact />
-        <PhotoSlot label="Cupom" taken={photos.receipt} onTaken={() => setPhotos((p) => ({ ...p, receipt: true }))} compact />
-        <PhotoSlot label="Painel" taken={photos.panel} onTaken={() => setPhotos((p) => ({ ...p, panel: true }))} compact />
+        <PhotoSlot
+          label="Bomba"
+          folder="abastecimento"
+          taken={photos.pump}
+          onTaken={(ref) => {
+            setPhotos((p) => ({ ...p, pump: true }));
+            if (ref && !ref.startsWith("blob:")) setPhotoPaths((p) => ({ ...p, pump: ref }));
+          }}
+          compact
+        />
+        <PhotoSlot
+          label="Cupom"
+          folder="abastecimento"
+          taken={photos.receipt}
+          onTaken={(ref) => {
+            setPhotos((p) => ({ ...p, receipt: true }));
+            if (ref && !ref.startsWith("blob:")) setPhotoPaths((p) => ({ ...p, receipt: ref }));
+          }}
+          compact
+        />
+        <PhotoSlot
+          label="Painel"
+          folder="abastecimento"
+          taken={photos.panel}
+          onTaken={(ref) => {
+            setPhotos((p) => ({ ...p, panel: true }));
+            if (ref && !ref.startsWith("blob:")) setPhotoPaths((p) => ({ ...p, panel: ref }));
+          }}
+          compact
+        />
       </div>
 
-      <Field label="Odometro" hint={last ? `Ultimo: ${num(last.odometer)} km. Rastreador: +${state.sim.trackerKmSinceLastFuel} km desde entao` : undefined}>
-        <TextInput value={odo} onChange={setOdo} inputMode="numeric" suffix="km" placeholder={last ? String(last.odometer + state.sim.trackerKmSinceLastFuel) : ""} />
+      <Field
+        label="Odometro"
+        hint={
+          last
+            ? `Ultimo: ${num(last.odometer)} km. Rastreador: +${state.sim.trackerKmSinceLastFuel} km desde entao`
+            : undefined
+        }
+      >
+        <TextInput
+          value={odo}
+          onChange={setOdo}
+          inputMode="numeric"
+          suffix="km"
+          placeholder={last ? String(last.odometer + state.sim.trackerKmSinceLastFuel) : ""}
+        />
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Diesel S10">
@@ -249,7 +377,12 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
           <TextInput value={arlaPrice} onChange={setArlaPrice} inputMode="decimal" suffix="R$" />
         </Field>
       </div>
-      <Toggle checked={tankFull} onChange={setTankFull} label="Completou o tanque?" hint="So tanque cheio fecha o calculo de km/l" />
+      <Toggle
+        checked={tankFull}
+        onChange={setTankFull}
+        label="Completou o tanque?"
+        hint="So tanque cheio fecha o calculo de km/l"
+      />
       <Field label="Pagamento">
         <Segmented
           value={payment}
@@ -266,11 +399,35 @@ export function FuelFormPage({ onDone }: { onDone: () => void }) {
       {alerts.length ? (
         <div className="space-y-1.5">
           {alerts.map((a) => (
-            <div key={a.code} className={cn("flex gap-2 rounded-2xl p-3 text-[12.5px] font-semibold", a.level === "bloqueio" ? "bg-destructive/10 text-destructive" : "bg-warning/12 text-warning")}>
-              {a.level === "bloqueio" ? <Ban className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
+            <div
+              key={a.code}
+              className={cn(
+                "flex gap-2 rounded-2xl p-3 text-[12.5px] font-semibold",
+                a.level === "bloqueio"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-warning/12 text-warning",
+              )}
+            >
+              {a.level === "bloqueio" ? (
+                <Ban className="h-4 w-4 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+              )}
               {a.message}
             </div>
           ))}
+          {!blocked ? (
+            <Field
+              label="Explique o alerta"
+              hint="Obrigatorio quando ha alerta. A central confere e aprova ou recusa."
+            >
+              <TextArea
+                value={justification}
+                onChange={setJustification}
+                placeholder="Ex.: troquei de posto porque a bomba do credenciado estava quebrada"
+              />
+            </Field>
+          ) : null}
         </div>
       ) : filled ? (
         <div className="flex items-center gap-2 rounded-2xl bg-primary/10 p-3 text-[12.5px] font-semibold text-primary">

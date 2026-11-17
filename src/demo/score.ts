@@ -27,11 +27,28 @@ export type ScoreLine = {
 };
 
 export function computeScore(state: DemoState) {
+  // Ligado na Frotak: a nota vem calculada do banco (private.driver_score).
+  const server = state.live?.score;
+  if (server) {
+    const lines = server.lines.map((l) => ({
+      key: l.key as ScoreLine["key"],
+      label: l.label,
+      points: l.points,
+      max: l.max,
+      why: l.available ? l.why : `Sem dado: ${l.why}`,
+    }));
+    const tier = server.tier
+      ? (PRIZE_TIERS.find((t) => t.min === server.tier!.min) ?? { ...server.tier })
+      : undefined;
+    return { total: server.total, lines, tier, kmPerLiter: server.kmPerLiter ?? 0 };
+  }
   const lines: ScoreLine[] = [];
   const kml = fullToFull(state.fuelRecords).average ?? 0;
   const target = state.vehicle.kmPerLiterTarget;
   const consumoRatio = target > 0 ? Math.min(1.1, kml / target) : 0;
-  const consumoPts = Math.round(SCORE_WEIGHTS.consumo * Math.max(0, Math.min(1, (consumoRatio - 0.85) / 0.2)));
+  const consumoPts = Math.round(
+    SCORE_WEIGHTS.consumo * Math.max(0, Math.min(1, (consumoRatio - 0.85) / 0.2)),
+  );
   lines.push({
     key: "consumo",
     label: "Consumo (km/l)",
@@ -77,7 +94,9 @@ export function computeScore(state: DemoState) {
     label: "Pontualidade nas janelas",
     points: pontPts,
     max: SCORE_WEIGHTS.pontualidade,
-    why: late ? `${late} chegada fora da janela hoje (-3 cada).` : "Chegadas dentro da janela neste mes, com 1 atraso na semana passada.",
+    why: late
+      ? `${late} chegada fora da janela hoje (-3 cada).`
+      : "Chegadas dentro da janela neste mes, com 1 atraso na semana passada.",
   });
 
   const checklistDone = state.checklists.length > 0;
@@ -87,7 +106,9 @@ export function computeScore(state: DemoState) {
     label: "Checklist do veiculo",
     points: chkPts,
     max: SCORE_WEIGHTS.checklist,
-    why: checklistDone ? "Checklist de saida feito hoje." : "Checklist de hoje ainda nao foi feito (-4).",
+    why: checklistDone
+      ? "Checklist de saida feito hoje."
+      : "Checklist de hoje ainda nao foi feito (-4).",
   });
 
   const now = Date.now();
@@ -98,7 +119,9 @@ export function computeScore(state: DemoState) {
     label: "Documentos e canhotos",
     points: docPts,
     max: SCORE_WEIGHTS.documentos,
-    why: expired ? `${expired} documento vencido (-5 cada).` : "Documentos em dia e canhotos enviados.",
+    why: expired
+      ? `${expired} documento vencido (-5 cada).`
+      : "Documentos em dia e canhotos enviados.",
   });
 
   const total = lines.reduce((s, l) => s + l.points, 0);

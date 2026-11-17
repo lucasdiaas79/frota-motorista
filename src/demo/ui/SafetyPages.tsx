@@ -1,47 +1,102 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Ban, Check, CheckCircle2, ChevronRight, FileBadge, Megaphone, MessageSquare, Minus, Send, Siren, X } from "lucide-react";
+import {
+  Ban,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  FileBadge,
+  Megaphone,
+  MessageSquare,
+  Minus,
+  Send,
+  Siren,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ackNotice, activeTrip, addOccurrence, renewDocument, replyOccurrence, submitChecklist, useDemo } from "../store";
+import {
+  ackNotice,
+  activeTrip,
+  addOccurrence,
+  isLive,
+  renewDocument,
+  replyOccurrence,
+  submitChecklist,
+  useDemo,
+} from "../store";
+import { uploadOpsFile } from "../live";
 import { captureGeo, fmtGeo } from "../geo";
 import { CDD } from "../seed";
 import { fmtClock } from "../jornada";
 import type { ChecklistAnswer, Occurrence, OccurrenceKind } from "../types";
-import { BigButton, EmptyState, Field, Pill, PhotoSlot, TextArea, TextInput, dayLabel, parseNum } from "./kit";
+import {
+  BigButton,
+  EmptyState,
+  Field,
+  Pill,
+  PhotoSlot,
+  TextArea,
+  TextInput,
+  dayLabel,
+  parseNum,
+} from "./kit";
 
 // ------------------------------------------------------------------ checklist
 
-export function ChecklistPage({ moment, onDone }: { moment: "saida" | "chegada"; onDone: () => void }) {
+export function ChecklistPage({
+  moment,
+  onDone,
+}: {
+  moment: "saida" | "chegada";
+  onDone: () => void;
+}) {
   const template = useDemo((s) => s.checklistTemplate);
   const trip = useDemo(activeTrip);
   const odometer = useDemo((s) => s.vehicle.odometer);
   const history = useDemo((s) => s.checklists);
-  const [answers, setAnswers] = useState<Record<string, { answer: ChecklistAnswer; note?: string; photo?: boolean }>>({});
+  const [answers, setAnswers] = useState<
+    Record<string, { answer: ChecklistAnswer; note?: string; photo?: boolean }>
+  >({});
   const [odo, setOdo] = useState("");
   const groups = [...new Set(template.map((i) => i.group))];
   const answered = template.filter((i) => answers[i.id]).length;
   const criticalFail = template.filter((i) => i.critical && answers[i.id]?.answer === "nok");
-  const missingNotes = template.filter((i) => answers[i.id]?.answer === "nok" && (!answers[i.id]?.note || !answers[i.id]?.photo));
+  const missingNotes = template.filter(
+    (i) => answers[i.id]?.answer === "nok" && (!answers[i.id]?.note || !answers[i.id]?.photo),
+  );
 
-  const set = (id: string, answer: ChecklistAnswer) => setAnswers((a) => ({ ...a, [id]: { ...a[id], answer } }));
+  const set = (id: string, answer: ChecklistAnswer) =>
+    setAnswers((a) => ({ ...a, [id]: { ...a[id], answer } }));
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-2xl bg-surface-2/50 p-3">
         <div>
-          <p className="text-[14px] font-extrabold">Checklist de {moment === "saida" ? "saida" : "chegada"}</p>
-          <p className="text-[12px] text-muted-foreground">{answered} de {template.length} itens - {history.length} feitos este mes</p>
+          <p className="text-[14px] font-extrabold">
+            Checklist de {moment === "saida" ? "saida" : "chegada"}
+          </p>
+          <p className="text-[12px] text-muted-foreground">
+            {answered} de {template.length} itens - {history.length} feitos este mes
+          </p>
         </div>
         <button
-          onClick={() => setAnswers(Object.fromEntries(template.map((i) => [i.id, { answer: "ok" as const }])))}
+          onClick={() =>
+            setAnswers(Object.fromEntries(template.map((i) => [i.id, { answer: "ok" as const }])))
+          }
           className="rounded-xl bg-primary/12 px-3 py-2 text-[12px] font-extrabold text-primary"
         >
           Tudo OK
         </button>
       </div>
       <Field label="Odometro">
-        <TextInput value={odo} onChange={setOdo} placeholder={String(odometer)} inputMode="numeric" suffix="km" />
+        <TextInput
+          value={odo}
+          onChange={setOdo}
+          placeholder={String(odometer)}
+          inputMode="numeric"
+          suffix="km"
+        />
       </Field>
       {groups.map((g) => (
         <div key={g}>
@@ -52,26 +107,66 @@ export function ChecklistPage({ moment, onDone }: { moment: "saida" | "chegada";
               .map((item) => {
                 const a = answers[item.id];
                 return (
-                  <div key={item.id} className={cn("rounded-2xl border p-3", a?.answer === "nok" ? "border-destructive/40 bg-destructive/6" : "border-border")}>
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "rounded-2xl border p-3",
+                      a?.answer === "nok"
+                        ? "border-destructive/40 bg-destructive/6"
+                        : "border-border",
+                    )}
+                  >
                     <div className="flex items-center gap-2">
                       <p className="min-w-0 flex-1 text-[13.5px] font-bold">
                         {item.label}
-                        {item.critical ? <span className="ml-1 text-[10px] font-black text-destructive uppercase">critico</span> : null}
+                        {item.critical ? (
+                          <span className="ml-1 text-[10px] font-black text-destructive uppercase">
+                            critico
+                          </span>
+                        ) : null}
                       </p>
-                      <AnswerBtn active={a?.answer === "ok"} tone="ok" onClick={() => set(item.id, "ok")}>
+                      <AnswerBtn
+                        active={a?.answer === "ok"}
+                        tone="ok"
+                        onClick={() => set(item.id, "ok")}
+                      >
                         <Check className="h-4 w-4" />
                       </AnswerBtn>
-                      <AnswerBtn active={a?.answer === "nok"} tone="nok" onClick={() => set(item.id, "nok")}>
+                      <AnswerBtn
+                        active={a?.answer === "nok"}
+                        tone="nok"
+                        onClick={() => set(item.id, "nok")}
+                      >
                         <X className="h-4 w-4" />
                       </AnswerBtn>
-                      <AnswerBtn active={a?.answer === "na"} tone="na" onClick={() => set(item.id, "na")}>
+                      <AnswerBtn
+                        active={a?.answer === "na"}
+                        tone="na"
+                        onClick={() => set(item.id, "na")}
+                      >
                         <Minus className="h-4 w-4" />
                       </AnswerBtn>
                     </div>
                     {a?.answer === "nok" ? (
                       <div className="mt-2 space-y-2">
-                        <TextInput value={a.note ?? ""} onChange={(v) => setAnswers((s) => ({ ...s, [item.id]: { ...s[item.id]!, note: v } }))} placeholder="O que esta errado?" />
-                        <PhotoSlot label="Foto do problema" taken={Boolean(a.photo)} onTaken={() => setAnswers((s) => ({ ...s, [item.id]: { ...s[item.id]!, photo: true } }))} compact />
+                        <TextInput
+                          value={a.note ?? ""}
+                          onChange={(v) =>
+                            setAnswers((s) => ({ ...s, [item.id]: { ...s[item.id]!, note: v } }))
+                          }
+                          placeholder="O que esta errado?"
+                        />
+                        <PhotoSlot
+                          label="Foto do problema"
+                          taken={Boolean(a.photo)}
+                          onTaken={() =>
+                            setAnswers((s) => ({
+                              ...s,
+                              [item.id]: { ...s[item.id]!, photo: true },
+                            }))
+                          }
+                          compact
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -82,7 +177,8 @@ export function ChecklistPage({ moment, onDone }: { moment: "saida" | "chegada";
       ))}
       {criticalFail.length ? (
         <div className="flex gap-2 rounded-2xl bg-destructive/10 p-3 text-[12.5px] font-semibold text-destructive">
-          <Ban className="h-4 w-4 shrink-0" /> Item critico reprovado: a viagem fica bloqueada e a manutencao e avisada.
+          <Ban className="h-4 w-4 shrink-0" /> Item critico reprovado: a viagem fica bloqueada e a
+          manutencao e avisada.
         </div>
       ) : null}
       <BigButton
@@ -105,20 +201,27 @@ export function ChecklistPage({ moment, onDone }: { moment: "saida" | "chegada";
             approved,
           });
           if (!approved) {
-            addOccurrence({
-              kind: "quebra",
-              at: new Date().toISOString(),
-              note: `Checklist reprovado: ${criticalFail.map((c) => c.label).join(", ")}`,
-              photo: true,
-              geo,
-              severity: "alta",
-              ...(trip ? { tripId: trip.id } : {}),
-            });
+            // Ligado na Frotak o banco ja abre a ocorrencia do checklist reprovado.
+            addOccurrence(
+              {
+                kind: "quebra",
+                at: new Date().toISOString(),
+                note: `Checklist reprovado: ${criticalFail.map((c) => c.label).join(", ")}`,
+                photo: true,
+                geo,
+                severity: "alta",
+                ...(trip ? { tripId: trip.id } : {}),
+              },
+              { remote: false },
+            );
           }
           onDone();
-          toast[approved ? "success" : "error"](approved ? "Checklist aprovado" : "Checklist reprovado", {
-            description: approved ? "Viagem liberada" : "Pendencia aberta para a manutencao",
-          });
+          toast[approved ? "success" : "error"](
+            approved ? "Checklist aprovado" : "Checklist reprovado",
+            {
+              description: approved ? "Viagem liberada" : "Pendencia aberta para a manutencao",
+            },
+          );
         }}
       >
         Enviar checklist
@@ -127,10 +230,30 @@ export function ChecklistPage({ moment, onDone }: { moment: "saida" | "chegada";
   );
 }
 
-function AnswerBtn({ active, tone, onClick, children }: { active: boolean; tone: "ok" | "nok" | "na"; onClick: () => void; children: React.ReactNode }) {
-  const colors = { ok: "bg-primary text-primary-foreground", nok: "bg-destructive text-white", na: "bg-muted-foreground text-background" };
+function AnswerBtn({
+  active,
+  tone,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  tone: "ok" | "nok" | "na";
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const colors = {
+    ok: "bg-primary text-primary-foreground",
+    nok: "bg-destructive text-white",
+    na: "bg-muted-foreground text-background",
+  };
   return (
-    <button onClick={onClick} className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", active ? colors[tone] : "bg-surface-2 text-muted-foreground")}>
+    <button
+      onClick={onClick}
+      className={cn(
+        "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+        active ? colors[tone] : "bg-surface-2 text-muted-foreground",
+      )}
+    >
       {children}
     </button>
   );
@@ -181,7 +304,9 @@ export function OccurrencePage() {
   const [kind, setKind] = useState<OccurrenceKind>("pneu");
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState(false);
-  const opened = list.find((o) => o.id === mode);
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  // Ligado na Frotak o id local vira o id do banco quando o servidor responde: abre a mais recente.
+  const opened = list.find((o) => o.id === mode) ?? (mode.startsWith("occ_") ? list[0] : undefined);
 
   if (opened) return <OccurrenceThread occ={opened} onBack={() => setMode("list")} />;
 
@@ -195,16 +320,31 @@ export function OccurrencePage() {
               <button
                 key={k}
                 onClick={() => setKind(k)}
-                className={cn("rounded-2xl border px-2 py-3 text-[12px] font-extrabold", kind === k ? "border-primary bg-primary/10 text-primary" : "border-border")}
+                className={cn(
+                  "rounded-2xl border px-2 py-3 text-[12px] font-extrabold",
+                  kind === k ? "border-primary bg-primary/10 text-primary" : "border-border",
+                )}
               >
                 {OCC_LABEL[k]}
               </button>
             ))}
         </div>
         <Field label="O que aconteceu">
-          <TextArea value={note} onChange={setNote} placeholder="Descreva rapido. A posicao vai junto." />
+          <TextArea
+            value={note}
+            onChange={setNote}
+            placeholder="Descreva rapido. A posicao vai junto."
+          />
         </Field>
-        <PhotoSlot label="Foto" taken={photo} onTaken={() => setPhoto(true)} />
+        <PhotoSlot
+          label="Foto"
+          folder="ocorrencias"
+          taken={photo}
+          onTaken={(ref) => {
+            setPhoto(true);
+            if (ref && !ref.startsWith("blob:")) setPhotoPaths((p) => [...p, ref]);
+          }}
+        />
         <BigButton
           icon={<Send className="h-5 w-5" />}
           onClick={async () => {
@@ -215,16 +355,29 @@ export function OccurrencePage() {
               at: new Date().toISOString(),
               note: note || OCC_LABEL[kind],
               photo,
+              ...(photoPaths.length ? { photoPaths } : {}),
               geo,
               severity: SEVERITY[kind],
               ...(trip ? { tripId: trip.id } : {}),
               ...(stop ? { stopId: stop.id } : {}),
             });
-            toast.success("Central avisada na hora", { description: "Notificacao enviada ao gestor" });
+            if (isLive() && !navigator.onLine)
+              toast.warning("Ocorrencia guardada no celular", {
+                description: "Sobe sozinha quando o sinal voltar, com a hora certa.",
+              });
+            else
+              toast.success("Central avisada na hora", {
+                description: "Notificacao enviada ao gestor",
+              });
             const reply = CENTRAL_REPLY[kind];
-            if (reply) window.setTimeout(() => replyOccurrence(id, reply, "central", "em_atendimento"), 4000);
+            if (reply)
+              window.setTimeout(
+                () => replyOccurrence(id, reply, "central", "em_atendimento"),
+                4000,
+              );
             setNote("");
             setPhoto(false);
+            setPhotoPaths([]);
             setMode(id);
           }}
         >
@@ -237,17 +390,46 @@ export function OccurrencePage() {
   return (
     <div className="space-y-3">
       <BigButton onClick={() => setMode("new")}>Nova ocorrencia</BigButton>
-      {list.length === 0 ? <EmptyState icon={<MessageSquare />} title="Sem ocorrencias" text="Pneu, quebra, avaria ou atraso: registre aqui." /> : null}
+      {list.length === 0 ? (
+        <EmptyState
+          icon={<MessageSquare />}
+          title="Sem ocorrencias"
+          text="Pneu, quebra, avaria ou atraso: registre aqui."
+        />
+      ) : null}
       {list.map((o) => (
-        <button key={o.id} onClick={() => setMode(o.id)} className="flex w-full items-center gap-3 rounded-2xl border border-border p-3 text-left">
-          <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", o.status === "resolvida" ? "bg-primary" : o.severity === "alta" ? "bg-destructive" : "bg-warning")} />
+        <button
+          key={o.id}
+          onClick={() => setMode(o.id)}
+          className="flex w-full items-center gap-3 rounded-2xl border border-border p-3 text-left"
+        >
+          <span
+            className={cn(
+              "h-2.5 w-2.5 shrink-0 rounded-full",
+              o.status === "resolvida"
+                ? "bg-primary"
+                : o.severity === "alta"
+                  ? "bg-destructive"
+                  : "bg-warning",
+            )}
+          />
           <span className="min-w-0 flex-1">
             <span className="block text-[14px] font-extrabold">{OCC_LABEL[o.kind]}</span>
             <span className="block truncate text-[12px] text-muted-foreground">
               {dayLabel(o.at)} {fmtClock(o.at)} - {o.note}
             </span>
           </span>
-          <Pill tone={o.status === "resolvida" ? "primary" : o.status === "em_atendimento" ? "info" : "warning"}>{o.status.replace("_", " ")}</Pill>
+          <Pill
+            tone={
+              o.status === "resolvida"
+                ? "primary"
+                : o.status === "em_atendimento"
+                  ? "info"
+                  : "warning"
+            }
+          >
+            {o.status.replace("_", " ")}
+          </Pill>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
       ))}
@@ -259,26 +441,46 @@ function OccurrenceThread({ occ, onBack }: { occ: Occurrence; onBack: () => void
   const [text, setText] = useState("");
   return (
     <div className="space-y-3">
-      <button onClick={onBack} className="text-[13px] font-extrabold text-primary">Voltar</button>
+      <button onClick={onBack} className="text-[13px] font-extrabold text-primary">
+        Voltar
+      </button>
       <div className="rounded-2xl bg-surface-2/50 p-3">
         <p className="text-[15px] font-extrabold">{OCC_LABEL[occ.kind]}</p>
         <p className="text-[12px] text-muted-foreground">
           {dayLabel(occ.at)} {fmtClock(occ.at)} - {fmtGeo(occ.geo)}
         </p>
         <div className="mt-2 flex gap-1.5">
-          <Pill tone={occ.severity === "alta" ? "danger" : occ.severity === "media" ? "warning" : "muted"}>gravidade {occ.severity}</Pill>
+          <Pill
+            tone={
+              occ.severity === "alta" ? "danger" : occ.severity === "media" ? "warning" : "muted"
+            }
+          >
+            gravidade {occ.severity}
+          </Pill>
           {occ.photo ? <Pill>com foto</Pill> : null}
           {!occ.synced ? <Pill tone="warning">na fila</Pill> : null}
         </div>
       </div>
       <div className="space-y-2">
         {occ.thread.map((m, i) => (
-          <div key={i} className={cn("max-w-[85%] rounded-2xl p-3 text-[13px]", m.from === "motorista" ? "ml-auto bg-primary text-primary-foreground" : "bg-surface-2")}>
+          <div
+            key={i}
+            className={cn(
+              "max-w-[85%] rounded-2xl p-3 text-[13px]",
+              m.from === "motorista"
+                ? "ml-auto bg-primary text-primary-foreground"
+                : "bg-surface-2",
+            )}
+          >
             <p className="font-semibold">{m.text}</p>
-            <p className="mt-1 text-[10px] opacity-70">{m.from === "central" ? "Central" : "Voce"} - {fmtClock(m.at)}</p>
+            <p className="mt-1 text-[10px] opacity-70">
+              {m.from === "central" ? "Central" : "Voce"} - {fmtClock(m.at)}
+            </p>
           </div>
         ))}
-        {occ.status === "aberta" ? <p className="text-center text-[12px] text-muted-foreground">Aguardando a central...</p> : null}
+        {occ.status === "aberta" ? (
+          <p className="text-center text-[12px] text-muted-foreground">Aguardando a central...</p>
+        ) : null}
       </div>
       <div className="flex gap-2">
         <div className="flex-1">
@@ -322,7 +524,16 @@ export function EmergencyPage({ onDone }: { onDone: () => void }) {
       severity: "alta",
       ...(trip ? { tripId: trip.id } : {}),
     });
-    window.setTimeout(() => replyOccurrence(id, "Recebemos o alerta. Estamos ligando para voce e acompanhando pelo rastreador.", "central", "em_atendimento"), 3000);
+    window.setTimeout(
+      () =>
+        replyOccurrence(
+          id,
+          "Recebemos o alerta. Estamos ligando para voce e acompanhando pelo rastreador.",
+          "central",
+          "em_atendimento",
+        ),
+      3000,
+    );
   };
 
   return (
@@ -331,14 +542,30 @@ export function EmergencyPage({ onDone }: { onDone: () => void }) {
         <>
           <CheckCircle2 className="mx-auto mt-4 h-14 w-14 text-destructive" />
           <p className="text-[20px] font-extrabold">Alerta enviado</p>
-          <p className="text-[13px] text-muted-foreground">A central recebeu sua posicao e vai ligar agora. Se puder, va para um local seguro.</p>
-          <a href="tel:190" className="block rounded-2xl bg-destructive py-4 text-[16px] font-extrabold text-white">Ligar 190</a>
-          <a href="tel:193" className="block rounded-2xl border border-destructive py-4 text-[16px] font-extrabold text-destructive">Ligar 193</a>
-          <BigButton tone="ghost" onClick={onDone}>Voltar</BigButton>
+          <p className="text-[13px] text-muted-foreground">
+            A central recebeu sua posicao e vai ligar agora. Se puder, va para um local seguro.
+          </p>
+          <a
+            href="tel:190"
+            className="block rounded-2xl bg-destructive py-4 text-[16px] font-extrabold text-white"
+          >
+            Ligar 190
+          </a>
+          <a
+            href="tel:193"
+            className="block rounded-2xl border border-destructive py-4 text-[16px] font-extrabold text-destructive"
+          >
+            Ligar 193
+          </a>
+          <BigButton tone="ghost" onClick={onDone}>
+            Voltar
+          </BigButton>
         </>
       ) : (
         <>
-          <p className="mt-2 text-[14px] text-muted-foreground">Segure o botao por 2 segundos. A central recebe sua posicao na hora.</p>
+          <p className="mt-2 text-[14px] text-muted-foreground">
+            Segure o botao por 2 segundos. A central recebe sua posicao na hora.
+          </p>
           <motion.button
             onPointerDown={() => {
               window.clearInterval(timer.current);
@@ -363,7 +590,10 @@ export function EmergencyPage({ onDone }: { onDone: () => void }) {
             whileTap={{ scale: 0.96 }}
             className="relative mx-auto grid h-52 w-52 place-items-center overflow-hidden rounded-full bg-destructive text-white shadow-[0_20px_60px_-20px_var(--destructive)] select-none"
           >
-            <span className="absolute inset-x-0 bottom-0 bg-black/25" style={{ height: `${progress * 100}%` }} />
+            <span
+              className="absolute inset-x-0 bottom-0 bg-black/25"
+              style={{ height: `${progress * 100}%` }}
+            />
             <span className="relative flex flex-col items-center gap-2">
               <Siren className="h-14 w-14" />
               <span className="text-[17px] font-black">SEGURE</span>
@@ -380,15 +610,60 @@ export function EmergencyPage({ onDone }: { onDone: () => void }) {
 export function DocsPage() {
   const docs = useDemo((s) => s.documents);
   const now = Date.now();
+  const live = isLive();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [target, setTarget] = useState<string>();
+  const [sending, setSending] = useState<string>();
   return (
     <div className="space-y-2">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,application/pdf"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const id = target;
+          e.target.value = "";
+          if (!file || !id) return;
+          setSending(id);
+          uploadOpsFile(file, "documentos", file.type === "application/pdf" ? "pdf" : "jpg")
+            .then((path) => {
+              renewDocument(id, new Date(now + 365 * 86_400_000).toISOString(), path);
+              toast.success("Novo documento enviado para a central conferir");
+            })
+            .catch(() =>
+              toast.error("Nao foi possivel enviar", {
+                description: "Confira o sinal e tente de novo.",
+              }),
+            )
+            .finally(() => setSending(undefined));
+        }}
+      />
+      {docs.length === 0 ? (
+        <EmptyState
+          icon={<FileBadge className="h-6 w-6" />}
+          title="Nenhum documento cadastrado"
+          text="A central cadastra CNH, toxicologico e cursos com a data de vencimento."
+        />
+      ) : null}
       {docs.map((d) => {
         const days = Math.round((new Date(d.expiresAt).getTime() - now) / 86_400_000);
         const tone = days < 0 ? "danger" : days <= 30 ? "warning" : "primary";
         return (
           <div key={d.id} className="rounded-2xl border border-border p-3.5">
             <div className="flex items-start gap-3">
-              <FileBadge className={cn("mt-0.5 h-5 w-5 shrink-0", tone === "danger" ? "text-destructive" : tone === "warning" ? "text-warning" : "text-primary")} />
+              <FileBadge
+                className={cn(
+                  "mt-0.5 h-5 w-5 shrink-0",
+                  tone === "danger"
+                    ? "text-destructive"
+                    : tone === "warning"
+                      ? "text-warning"
+                      : "text-primary",
+                )}
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-[14px] font-extrabold">{d.label}</p>
                 <p className="text-[12px] text-muted-foreground">
@@ -398,21 +673,34 @@ export function DocsPage() {
               </div>
               <Pill tone={tone}>{days < 0 ? `vencido ha ${-days}d` : `${days} dias`}</Pill>
             </div>
-            {days <= 30 ? (
+            {d.status === "enviado" ? (
+              <p className="mt-2.5 rounded-xl bg-sky-500/10 py-2.5 text-center text-[12.5px] font-extrabold text-sky-600 dark:text-sky-400">
+                Enviado, aguardando a central conferir
+              </p>
+            ) : days <= 30 ? (
               <button
+                disabled={sending === d.id}
                 onClick={() => {
+                  if (live) {
+                    setTarget(d.id);
+                    fileRef.current?.click();
+                    return;
+                  }
                   renewDocument(d.id, new Date(now + 365 * 86_400_000).toISOString());
                   toast.success("Novo documento enviado para a central conferir");
                 }}
-                className="mt-2.5 w-full rounded-xl bg-primary/12 py-2.5 text-[12.5px] font-extrabold text-primary"
+                className="mt-2.5 w-full rounded-xl bg-primary/12 py-2.5 text-[12.5px] font-extrabold text-primary disabled:opacity-50"
               >
-                Enviar documento renovado (foto)
+                {sending === d.id ? "Enviando..." : "Enviar documento renovado (foto)"}
               </button>
             ) : null}
           </div>
         );
       })}
-      <p className="px-1 text-[11.5px] text-muted-foreground">A central e avisada 30 dias antes de cada vencimento. Documento obrigatorio vencido bloqueia o inicio da viagem.</p>
+      <p className="px-1 text-[11.5px] text-muted-foreground">
+        A central e avisada 30 dias antes de cada vencimento. Documento obrigatorio vencido bloqueia
+        o inicio da viagem.
+      </p>
     </div>
   );
 }
@@ -424,20 +712,35 @@ export function NoticesPage() {
   return (
     <div className="space-y-2.5">
       {notices.map((n) => (
-        <div key={n.id} className={cn("rounded-2xl border p-3.5", n.requiresAck && !n.ackAt ? "border-warning/40 bg-warning/8" : "border-border")}>
+        <div
+          key={n.id}
+          className={cn(
+            "rounded-2xl border p-3.5",
+            n.requiresAck && !n.ackAt ? "border-warning/40 bg-warning/8" : "border-border",
+          )}
+        >
           <div className="flex items-center gap-2">
             <Megaphone className="h-4 w-4 text-primary" />
-            <p className="label-xs">{n.from} - {dayLabel(n.at)}</p>
+            <p className="label-xs">
+              {n.from} - {dayLabel(n.at)}
+            </p>
           </div>
           <p className="mt-1.5 text-[15px] font-extrabold">{n.title}</p>
           <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{n.body}</p>
           {n.requiresAck ? (
             n.ackAt ? (
               <p className="mt-2 flex items-center gap-1 text-[12px] font-bold text-primary">
-                <CheckCircle2 className="h-4 w-4" /> Ciencia registrada {dayLabel(n.ackAt)} {fmtClock(n.ackAt)}
+                <CheckCircle2 className="h-4 w-4" /> Ciencia registrada {dayLabel(n.ackAt)}{" "}
+                {fmtClock(n.ackAt)}
               </p>
             ) : (
-              <BigButton className="mt-3" onClick={() => { ackNotice(n.id); toast.success("Ciencia registrada"); }}>
+              <BigButton
+                className="mt-3"
+                onClick={() => {
+                  ackNotice(n.id);
+                  toast.success("Ciencia registrada");
+                }}
+              >
                 Li e estou ciente
               </BigButton>
             )

@@ -8,7 +8,15 @@ import { captureGeo } from "../geo";
 import { CDD } from "../seed";
 import type { Navigate } from "./DemoApp";
 
-const EXAMPLES = ["Comecei a jornada", "Cheguei no cliente", "Parei para almocar", "Estou na fila", "Abasteci", "Pneu furou", "Emergencia"];
+const EXAMPLES = [
+  "Comecei a jornada",
+  "Cheguei no cliente",
+  "Parei para almocar",
+  "Estou na fila",
+  "Abasteci",
+  "Pneu furou",
+  "Emergencia",
+];
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -30,10 +38,7 @@ export function startListening(navigate: Navigate) {
 
 /** Entende o que o motorista falou e executa. Sem internet de IA, usa palavras-chave. */
 async function execute(text: string, navigate: Navigate) {
-  const t = text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+  const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const s = getState();
   const trip = activeTrip(s);
   const stop = trip?.stops[trip.currentStopIndex];
@@ -105,8 +110,15 @@ export function VoiceButton({ navigate }: { navigate: Navigate }) {
   };
 
   const listen = () => {
-    const Ctor = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    const Ctor =
+      (
+        window as unknown as {
+          SpeechRecognition?: new () => SpeechRecognitionLike;
+          webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+        }
+      ).SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike })
+        .webkitSpeechRecognition;
     setOpen(true);
     setHeard("");
     setAnswer("");
@@ -169,9 +181,13 @@ export function VoiceButton({ navigate }: { navigate: Navigate }) {
               </AnimatePresence>
               <Mic className="h-8 w-8" />
             </span>
-            <p className="mt-2 text-[13px] font-bold text-muted-foreground">{listening ? "Ouvindo..." : "Toque num exemplo ou fale"}</p>
+            <p className="mt-2 text-[13px] font-bold text-muted-foreground">
+              {listening ? "Ouvindo..." : "Toque num exemplo ou fale"}
+            </p>
           </div>
-          {heard ? <p className="rounded-2xl bg-surface-2 p-3 text-[14px] font-bold">"{heard}"</p> : null}
+          {heard ? (
+            <p className="rounded-2xl bg-surface-2 p-3 text-[14px] font-bold">"{heard}"</p>
+          ) : null}
           {answer ? (
             <p className="flex gap-2 rounded-2xl border border-primary/25 bg-primary/8 p-3 text-[14px] font-semibold">
               <Sparkles className="h-5 w-5 shrink-0 text-primary" /> {answer}
@@ -179,7 +195,11 @@ export function VoiceButton({ navigate }: { navigate: Navigate }) {
           ) : null}
           <div className="flex flex-wrap gap-1.5">
             {EXAMPLES.map((e) => (
-              <button key={e} onClick={() => void handle(e)} className="rounded-full border border-border px-3 py-2 text-[12.5px] font-bold">
+              <button
+                key={e}
+                onClick={() => void handle(e)}
+                className="rounded-full border border-border px-3 py-2 text-[12.5px] font-bold"
+              >
                 {e}
               </button>
             ))}

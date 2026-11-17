@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Camera, Check, ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { isLive } from "../store";
+import { uploadOpsFile } from "../live";
 
 export function useNow(intervalMs = 15_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -12,7 +15,15 @@ export function useNow(intervalMs = 15_000) {
   return now;
 }
 
-export function Card({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+export function Card({
+  children,
+  className,
+  onClick,
+}: {
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
   const Comp = onClick ? motion.button : motion.div;
   return (
     <Comp
@@ -24,9 +35,25 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
   );
 }
 
-export function IconChip({ children, tone = "primary", className }: { children: ReactNode; tone?: Tone; className?: string }) {
+export function IconChip({
+  children,
+  tone = "primary",
+  className,
+}: {
+  children: ReactNode;
+  tone?: Tone;
+  className?: string;
+}) {
   return (
-    <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-2xl", TONE_SOFT[tone], className)}>{children}</span>
+    <span
+      className={cn(
+        "grid h-10 w-10 shrink-0 place-items-center rounded-2xl",
+        TONE_SOFT[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -40,7 +67,15 @@ export const TONE_SOFT: Record<Tone, string> = {
   info: "bg-sky-500/12 text-sky-600 dark:text-sky-400",
 };
 
-export function Pill({ children, tone = "muted", className }: { children: ReactNode; tone?: Tone; className?: string }) {
+export function Pill({
+  children,
+  tone = "muted",
+  className,
+}: {
+  children: ReactNode;
+  tone?: Tone;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
@@ -98,7 +133,17 @@ export function BigButton({
   );
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone }) {
+export function Stat({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: Tone;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-surface-2/45 p-3">
       <p className="label-xs">{label}</p>
@@ -117,7 +162,15 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string | undefined; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string | undefined;
+  children: ReactNode;
+}) {
   return (
     <label className="block">
       <span className="label-xs">{label}</span>
@@ -149,12 +202,22 @@ export function TextInput({
         inputMode={inputMode ?? "text"}
         className="h-12 min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none placeholder:font-medium placeholder:text-muted-foreground/70"
       />
-      {suffix ? <span className="text-[13px] font-bold text-muted-foreground">{suffix}</span> : null}
+      {suffix ? (
+        <span className="text-[13px] font-bold text-muted-foreground">{suffix}</span>
+      ) : null}
     </div>
   );
 }
 
-export function TextArea({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function TextArea({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <textarea
       value={value}
@@ -176,7 +239,10 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="grid gap-1 rounded-2xl bg-surface-2 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0,1fr))` }}>
+    <div
+      className="grid gap-1 rounded-2xl bg-surface-2 p-1"
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0,1fr))` }}
+    >
       {options.map((o) => (
         <button
           key={o.value}
@@ -193,7 +259,17 @@ export function Segmented<T extends string>({
   );
 }
 
-export function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: string;
+}) {
   return (
     <button
       onClick={() => onChange(!checked)}
@@ -203,7 +279,12 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
         <span className="block text-[14px] font-bold">{label}</span>
         {hint ? <span className="block text-[12px] text-muted-foreground">{hint}</span> : null}
       </span>
-      <span className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors", checked ? "bg-primary" : "bg-border")}>
+      <span
+        className={cn(
+          "relative h-7 w-12 shrink-0 rounded-full transition-colors",
+          checked ? "bg-primary" : "bg-border",
+        )}
+      >
         <motion.span
           layout
           className="absolute top-1 h-5 w-5 rounded-full bg-white shadow"
@@ -214,20 +295,27 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
   );
 }
 
-/** Foto: abre a camera do celular de verdade; na demonstracao basta tocar para marcar. */
+/**
+ * Foto: abre a camera do celular de verdade; na demonstracao basta tocar para marcar.
+ * Ligado na Frotak, sempre abre a camera, envia a foto e devolve o caminho no armazenamento.
+ */
 export function PhotoSlot({
   label,
   taken,
   onTaken,
   compact,
+  folder = "fotos",
 }: {
   label: string;
   taken: boolean;
-  onTaken: (preview?: string) => void;
+  onTaken: (ref?: string) => void;
   compact?: boolean;
+  folder?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string>();
+  const [sending, setSending] = useState(false);
+  const live = isLive();
   return (
     <>
       <input
@@ -241,12 +329,25 @@ export function PhotoSlot({
           if (!file) return;
           const url = URL.createObjectURL(file);
           setPreview(url);
-          onTaken(url);
+          if (!live) {
+            onTaken(url);
+            return;
+          }
+          setSending(true);
+          uploadOpsFile(file, folder, (file.name.split(".").pop() || "jpg").toLowerCase())
+            .then((path) => onTaken(path))
+            .catch(() => {
+              onTaken();
+              toast.warning("Foto guardada so no celular", {
+                description: "Sem sinal para enviar agora. Tire de novo quando o sinal voltar.",
+              });
+            })
+            .finally(() => setSending(false));
         }}
       />
       <button
         onClick={() => {
-          if (taken) {
+          if (taken || live) {
             ref.current?.click();
             return;
           }
@@ -266,14 +367,19 @@ export function PhotoSlot({
         {preview ? (
           <img src={preview} alt="" className="h-10 w-10 rounded-xl object-cover" />
         ) : (
-          <span className={cn("grid h-10 w-10 place-items-center rounded-xl", taken ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground")}>
+          <span
+            className={cn(
+              "grid h-10 w-10 place-items-center rounded-xl",
+              taken ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground",
+            )}
+          >
             {taken ? <Check className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
           </span>
         )}
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-extrabold">{label}</span>
           <span className="block text-[11px] text-muted-foreground">
-            {taken ? "Foto anexada" : "Toque para fotografar"}
+            {sending ? "Enviando foto..." : taken ? "Foto anexada" : "Toque para fotografar"}
           </span>
         </span>
         {taken && !preview ? <ImageIcon className="ml-auto h-4 w-4 text-primary" /> : null}
@@ -282,15 +388,42 @@ export function PhotoSlot({
   );
 }
 
-export function ProgressRing({ value, size = 64, stroke = 7, tone = "primary", children }: { value: number; size?: number; stroke?: number; tone?: Tone; children?: ReactNode }) {
+export function ProgressRing({
+  value,
+  size = 64,
+  stroke = 7,
+  tone = "primary",
+  children,
+}: {
+  value: number;
+  size?: number;
+  stroke?: number;
+  tone?: Tone;
+  children?: ReactNode;
+}) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(1, value));
-  const color = tone === "danger" ? "var(--destructive)" : tone === "warning" ? "var(--warning)" : "var(--primary)";
+  const color =
+    tone === "danger"
+      ? "var(--destructive)"
+      : tone === "warning"
+        ? "var(--warning)"
+        : "var(--primary)";
   return (
-    <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+    <div
+      className="relative grid shrink-0 place-items-center"
+      style={{ width: size, height: size }}
+    >
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--surface-2)" strokeWidth={stroke} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="var(--surface-2)"
+          strokeWidth={stroke}
+          fill="none"
+        />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -310,10 +443,20 @@ export function ProgressRing({ value, size = 64, stroke = 7, tone = "primary", c
   );
 }
 
-export function EmptyState({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+export function EmptyState({
+  icon,
+  title,
+  text,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+}) {
   return (
     <div className="rounded-3xl border border-dashed border-border p-6 text-center">
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-surface-2 text-muted-foreground">{icon}</div>
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-surface-2 text-muted-foreground">
+        {icon}
+      </div>
       <p className="mt-3 text-[15px] font-extrabold">{title}</p>
       <p className="mt-1 text-[13px] text-muted-foreground">{text}</p>
     </div>
@@ -325,15 +468,25 @@ export function money(v: number) {
 }
 
 export function num(v: number, digits = 0) {
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return v.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 export function parseNum(value: string) {
-  const normalized = value.trim().replace(/\.(?=\d{3}(,|$))/g, "").replace(",", ".");
+  const normalized = value
+    .trim()
+    .replace(/\.(?=\d{3}(,|$))/g, "")
+    .replace(",", ".");
   const n = Number(normalized);
   return Number.isFinite(n) ? n : null;
 }
 
 export function dayLabel(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }

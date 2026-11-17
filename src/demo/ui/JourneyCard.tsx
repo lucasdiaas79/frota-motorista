@@ -31,7 +31,13 @@ export const ACTIVITY_TONE: Record<Activity, Tone> = {
   trabalho: "info",
 };
 
-const MANUAL: Exclude<Activity, "fora">[] = ["direcao", "espera", "refeicao", "descanso", "trabalho"];
+const MANUAL: Exclude<Activity, "fora">[] = [
+  "direcao",
+  "espera",
+  "refeicao",
+  "descanso",
+  "trabalho",
+];
 
 export function JourneyCard({ compact = false }: { compact?: boolean }) {
   const now = useNow(10_000);
@@ -45,13 +51,18 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
   const ended = Boolean(day?.endedAt);
   const Icon = ACTIVITY_ICON[summary.current];
   const drivingRatio = summary.continuousDrivingMin / RULES.maxContinuousDrivingMin;
-  const ringTone: Tone = drivingRatio >= 1 ? "danger" : drivingRatio >= 0.82 ? "warning" : "primary";
-  const sinceMin = summary.currentSince ? (now - new Date(summary.currentSince).getTime()) / 60_000 : 0;
+  const ringTone: Tone =
+    drivingRatio >= 1 ? "danger" : drivingRatio >= 0.82 ? "warning" : "primary";
+  const sinceMin = summary.currentSince
+    ? (now - new Date(summary.currentSince).getTime()) / 60_000
+    : 0;
 
   const change = async (activity: Exclude<Activity, "fora">) => {
     const geo = await captureGeo(CDD.geo);
     setActivity(activity, "motorista", ACTIVITY_LABEL[activity], geo);
-    toast.success(`Ponto marcado: ${ACTIVITY_LABEL[activity]}`, { description: `${fmtClock(new Date().toISOString())} com posicao` });
+    toast.success(`Ponto marcado: ${ACTIVITY_LABEL[activity]}`, {
+      description: `${fmtClock(new Date().toISOString())} com posicao`,
+    });
   };
 
   return (
@@ -74,14 +85,20 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
         <div className="mt-3 flex items-center gap-4">
           <ProgressRing value={drivingRatio} size={78} tone={ringTone}>
             <div className="text-center leading-none">
-              <p className="font-display text-[15px] font-extrabold">{fmtMin(summary.drivingLeftMin)}</p>
-              <p className="mt-0.5 text-[8.5px] font-bold text-muted-foreground uppercase">p/ pausa</p>
+              <p className="font-display text-[15px] font-extrabold">
+                {fmtMin(summary.drivingLeftMin)}
+              </p>
+              <p className="mt-0.5 text-[8.5px] font-bold text-muted-foreground uppercase">
+                p/ pausa
+              </p>
             </div>
           </ProgressRing>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <Icon className="h-5 w-5 text-primary" />
-              <p className="truncate text-[19px] font-extrabold">{ACTIVITY_LABEL[summary.current]}</p>
+              <p className="truncate text-[19px] font-extrabold">
+                {ACTIVITY_LABEL[summary.current]}
+              </p>
             </div>
             <p className="text-[12.5px] font-semibold text-muted-foreground">
               ha {fmtMin(sinceMin)} desde {fmtClock(summary.currentSince)}
@@ -89,7 +106,11 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
             <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
               <MiniStat label="Jornada" value={fmtMin(summary.workedMin)} />
               <MiniStat label="Direcao" value={fmtMin(summary.totals.direcao)} />
-              <MiniStat label="Extra" value={fmtMin(summary.extraMin)} warn={summary.extraMin > 0} />
+              <MiniStat
+                label="Extra"
+                value={fmtMin(summary.extraMin)}
+                warn={summary.extraMin > 0}
+              />
             </div>
           </div>
         </div>
@@ -100,12 +121,21 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
           <p className="text-[14px] text-muted-foreground">
             Marque o inicio para liberar a viagem. A hora vem do servidor e a posicao do GPS.
           </p>
-          {summary.interDayMin != null || prevEnd ? (
+          {prevEnd && Date.now() - new Date(prevEnd).getTime() < 4 * 86_400_000 ? (
             <p className="mt-1 text-[12px] font-semibold text-muted-foreground">
-              Fim da ultima jornada: {new Date(prevEnd).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+              Fim da ultima jornada:{" "}
+              {new Date(prevEnd).toLocaleString("pt-BR", {
+                weekday: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </p>
           ) : null}
-          <BigButton className="mt-3" icon={<LogIn className="h-5 w-5" />} onClick={() => setStartOpen(true)}>
+          <BigButton
+            className="mt-3"
+            icon={<LogIn className="h-5 w-5" />}
+            onClick={() => setStartOpen(true)}
+          >
             Iniciar jornada
           </BigButton>
         </div>
@@ -125,7 +155,9 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
                   onClick={() => void change(a)}
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-[10px] font-extrabold",
-                    active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface-2/40",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-surface-2/40",
                   )}
                 >
                   <I className="h-4.5 w-4.5" />
@@ -134,7 +166,9 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
               );
             })}
           </div>
-          <p className="mt-2 text-[11.5px] text-muted-foreground">{ACTIVITY_HINT[summary.current]}</p>
+          <p className="mt-2 text-[11.5px] text-muted-foreground">
+            {ACTIVITY_HINT[summary.current]}
+          </p>
           <button
             onClick={() => setEndOpen(true)}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-[13px] font-extrabold text-muted-foreground"
@@ -146,17 +180,24 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
 
       <Sheet open={startOpen} onClose={() => setStartOpen(false)} title="Iniciar jornada">
         <div className="space-y-3">
-          {summary.interDayMin != null || prevEnd ? (
+          {prevEnd && Date.now() - new Date(prevEnd).getTime() < 4 * 86_400_000 ? (
             <InterDayNotice prevEnd={prevEnd} />
           ) : null}
-          <Toggle checked={selfie} onChange={setSelfie} label="Tirar selfie de confirmacao" hint="Ajuda a provar quem marcou o ponto" />
+          <Toggle
+            checked={selfie}
+            onChange={setSelfie}
+            label="Tirar selfie de confirmacao"
+            hint="Ajuda a provar quem marcou o ponto"
+          />
           <BigButton
             icon={<LogIn className="h-5 w-5" />}
             onClick={async () => {
               const geo = await captureGeo(CDD.geo);
               startDay(geo, selfie);
               setStartOpen(false);
-              toast.success("Jornada iniciada", { description: `${fmtClock(new Date().toISOString())} - posicao registrada` });
+              toast.success("Jornada iniciada", {
+                description: `${fmtClock(new Date().toISOString())} - posicao registrada`,
+              });
             }}
           >
             Confirmar inicio agora
@@ -168,7 +209,12 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <MiniStat label="Trabalhado" value={fmtMin(summary.workedMin)} big />
-            <MiniStat label="Hora extra" value={fmtMin(summary.extraMin)} big warn={summary.extraMin > 0} />
+            <MiniStat
+              label="Hora extra"
+              value={fmtMin(summary.extraMin)}
+              big
+              warn={summary.extraMin > 0}
+            />
             <MiniStat label="Direcao" value={fmtMin(summary.totals.direcao)} big />
             <MiniStat label="Espera" value={fmtMin(summary.totals.espera)} big />
           </div>
@@ -197,7 +243,12 @@ function InterDayNotice({ prevEnd }: { prevEnd: string }) {
   const rest = (Date.now() - new Date(prevEnd).getTime()) / 60_000;
   const ok = rest >= RULES.minInterDayMin;
   return (
-    <div className={cn("rounded-2xl p-3.5 text-[13px] font-semibold", ok ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive")}>
+    <div
+      className={cn(
+        "rounded-2xl p-3.5 text-[13px] font-semibold",
+        ok ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive",
+      )}
+    >
       {ok
         ? `Descanso desde a ultima jornada: ${fmtMin(rest)}. Interjornada ok.`
         : `Descanso de so ${fmtMin(rest)} desde a ultima jornada. O minimo e 11h; a central sera avisada.`}
@@ -205,11 +256,29 @@ function InterDayNotice({ prevEnd }: { prevEnd: string }) {
   );
 }
 
-export function MiniStat({ label, value, warn, big }: { label: string; value: string; warn?: boolean; big?: boolean }) {
+export function MiniStat({
+  label,
+  value,
+  warn,
+  big,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+  big?: boolean;
+}) {
   return (
     <div className="rounded-xl bg-surface-2/60 px-2 py-1.5">
       <p className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">{label}</p>
-      <p className={cn("font-display font-extrabold", big ? "text-[18px]" : "text-[13px]", warn && "text-warning")}>{value}</p>
+      <p
+        className={cn(
+          "font-display font-extrabold",
+          big ? "text-[18px]" : "text-[13px]",
+          warn && "text-warning",
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }

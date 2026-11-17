@@ -23,7 +23,7 @@ const TABS: { id: DemoTab; label: string; icon: typeof Home }[] = [
 
 export type Navigate = (tab: DemoTab, page?: MorePage) => void;
 
-export function DemoApp() {
+export function DemoApp({ live = false }: { live?: boolean }) {
   const { theme } = useTheme();
   const [tab, setTab] = useState<DemoTab>("day");
   const [morePage, setMorePage] = useState<MorePage | null>(null);
@@ -44,7 +44,7 @@ export function DemoApp() {
   return (
     <main className="relative mx-auto flex h-dvh max-w-[520px] flex-col overflow-hidden bg-background">
       <AnimatePresence>
-        {offline ? (
+        {offline || (live && queue > 0) ? (
           <motion.div
             initial={{ height: 0 }}
             animate={{ height: "auto" }}
@@ -53,7 +53,9 @@ export function DemoApp() {
           >
             <div className="flex items-center gap-2 px-4 py-2 text-[12.5px] font-extrabold">
               <WifiOff className="h-4 w-4" />
-              Sem internet. {queue} registro{queue === 1 ? "" : "s"} guardado{queue === 1 ? "" : "s"} no celular, com a hora certa.
+              {offline
+                ? `Sem internet. ${queue} registro${queue === 1 ? "" : "s"} guardado${queue === 1 ? "" : "s"} no celular, com a hora certa.`
+                : `Enviando ${queue} registro${queue === 1 ? "" : "s"} para a central...`}
             </div>
           </motion.div>
         ) : null}
@@ -72,7 +74,9 @@ export function DemoApp() {
             {tab === "day" && <DayScreen navigate={navigate} />}
             {tab === "route" && <RouteScreen navigate={navigate} />}
             {tab === "ponto" && <PontoScreen />}
-            {tab === "more" && <MoreScreen page={morePage} onPage={setMorePage} navigate={navigate} />}
+            {tab === "more" && (
+              <MoreScreen page={morePage} onPage={setMorePage} navigate={navigate} />
+            )}
           </motion.div>
         </AnimatePresence>
         <VoiceButton navigate={navigate} />
@@ -83,7 +87,11 @@ export function DemoApp() {
         {TABS.map(({ id, label, icon: Icon }) => {
           const active = tab === id;
           return (
-            <button key={id} onClick={() => navigate(id)} className="relative flex flex-col items-center gap-1 py-1.5">
+            <button
+              key={id}
+              onClick={() => navigate(id)}
+              className="relative flex flex-col items-center gap-1 py-1.5"
+            >
               {active ? (
                 <motion.span
                   layoutId="demo-tab"
@@ -92,14 +100,21 @@ export function DemoApp() {
                 />
               ) : null}
               <span className="relative">
-                <Icon className={cn("h-5.5 w-5.5", active ? "text-primary" : "text-muted-foreground")} />
+                <Icon
+                  className={cn("h-5.5 w-5.5", active ? "text-primary" : "text-muted-foreground")}
+                />
                 {id === "more" && unackedNotices > 0 ? (
                   <span className="absolute -top-1 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-black text-white">
                     {unackedNotices}
                   </span>
                 ) : null}
               </span>
-              <span className={cn("relative text-[10px] font-bold tracking-wide", active ? "text-primary" : "text-muted-foreground")}>
+              <span
+                className={cn(
+                  "relative text-[10px] font-bold tracking-wide",
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              >
                 {label}
               </span>
             </button>

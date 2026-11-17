@@ -21,7 +21,13 @@ export function fullToFull(records: FuelRecord[]) {
   const sorted = [...records]
     .filter((r) => r.dieselLiters > 0 && r.odometer > 0)
     .sort((a, b) => a.odometer - b.odometer);
-  const intervals: { from: FuelRecord; to: FuelRecord; km: number; liters: number; kmPerLiter: number }[] = [];
+  const intervals: {
+    from: FuelRecord;
+    to: FuelRecord;
+    km: number;
+    liters: number;
+    kmPerLiter: number;
+  }[] = [];
   let anchor: FuelRecord | undefined;
   let liters = 0;
   for (const record of sorted) {
@@ -32,7 +38,8 @@ export function fullToFull(records: FuelRecord[]) {
     liters += record.dieselLiters;
     if (record.tankFull) {
       const km = record.odometer - anchor.odometer;
-      if (km > 0 && liters > 0) intervals.push({ from: anchor, to: record, km, liters, kmPerLiter: km / liters });
+      if (km > 0 && liters > 0)
+        intervals.push({ from: anchor, to: record, km, liters, kmPerLiter: km / liters });
       anchor = record;
       liters = 0;
     }

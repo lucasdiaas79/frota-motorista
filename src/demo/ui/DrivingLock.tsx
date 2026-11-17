@@ -26,7 +26,10 @@ export function DrivingLock({ navigate }: { navigate: Navigate }) {
         <OctagonAlert className="mx-auto h-10 w-10 text-warning" />
         <p className="mt-3 font-display text-[44px] leading-none font-extrabold">{speed} km/h</p>
         <p className="mt-2 text-[16px] font-extrabold">Caminhao em movimento</p>
-        <p className="mt-1 text-[13px] text-muted-foreground">Pare em local seguro para usar o app. Direcao continua: {fmtMin(journey.continuousDrivingMin)}.</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          Pare em local seguro para usar o app. Direcao continua:{" "}
+          {fmtMin(journey.continuousDrivingMin)}.
+        </p>
       </div>
       <div className="mt-auto space-y-3">
         <motion.button
@@ -58,7 +61,10 @@ export function DrivingLock({ navigate }: { navigate: Navigate }) {
         >
           <Siren className="h-6 w-6" /> Emergencia
         </motion.button>
-        <button onClick={() => setSim({ moving: false, speedKmh: 0 })} className="w-full py-2 text-[12px] font-bold text-muted-foreground">
+        <button
+          onClick={() => setSim({ moving: false, speedKmh: 0 })}
+          className="w-full py-2 text-[12px] font-bold text-muted-foreground"
+        >
           (demonstracao) Parar o caminhao
         </button>
       </div>

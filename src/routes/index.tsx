@@ -14,6 +14,9 @@ import { FuelSheet } from "@/components/app/FuelSheet";
 import { ExpenseSheet } from "@/components/app/ExpenseSheet";
 
 import { cn } from "@/lib/utils";
+import { OpsApp } from "@/demo/ui/OpsApp";
+import { fetchOpsContext } from "@/demo/live";
+import { readCachedLive } from "@/demo/store";
 import { useTheme } from "@/lib/theme";
 import {
   advanceDriverStage,
@@ -293,6 +296,26 @@ function App() {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel avancar");
     }
   };
+
+  // Tenant com os modulos da operacao (jornada, rotas, combustivel...): abre o app novo.
+  // undefined = ainda nao conferiu; null = segue no app antigo.
+  const [opsCtx, setOpsCtx] = useState<unknown>(undefined);
+  useEffect(() => {
+    if (!authenticated || opsCtx !== undefined) return;
+    if (context?.profile?.must_change_password) return;
+    if (!context && !loadError) return;
+    let alive = true;
+    fetchOpsContext()
+      .then((ctx) => alive && setOpsCtx(ctx))
+      .catch(() => alive && setOpsCtx(readCachedLive()?.live ? "cached" : null));
+    return () => {
+      alive = false;
+    };
+  }, [authenticated, context, loadError, opsCtx]);
+
+  if (authenticated && opsCtx) {
+    return <OpsApp ctx={opsCtx} />;
+  }
 
   if (booting) {
     return (

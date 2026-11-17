@@ -11,13 +11,7 @@ export type GeoPoint = {
 
 /** O que o motorista esta fazendo agora. Cada troca vira uma marcacao de ponto. */
 export type Activity =
-  | "fora"
-  | "direcao"
-  | "espera"
-  | "carga_descarga"
-  | "refeicao"
-  | "descanso"
-  | "trabalho";
+  "fora" | "direcao" | "espera" | "carga_descarga" | "refeicao" | "descanso" | "trabalho";
 
 export type PunchSource = "motorista" | "etapa" | "cerca" | "ajuste" | "voz";
 
@@ -48,13 +42,7 @@ export type WorkDay = {
 export type OperationKind = "distribuicao" | "transferencia";
 
 export type StopStatus =
-  | "pendente"
-  | "a_caminho"
-  | "chegou"
-  | "descarregando"
-  | "entregue"
-  | "parcial"
-  | "recusada";
+  "pendente" | "a_caminho" | "chegou" | "descarregando" | "entregue" | "parcial" | "recusada";
 
 export type RefusalReason =
   | "cliente_fechado"
@@ -96,6 +84,8 @@ export type Stop = {
     receiverName?: string;
     signature?: string; // data URL
     podPhoto?: boolean;
+    /** Caminho das fotos no armazenamento (app ligado na Frotak). */
+    podPhotoPaths?: string[];
     returnables: Partial<Record<ReturnableKind, number>>;
     payment?: { method: "boleto" | "pix" | "dinheiro"; amount: number; received: boolean };
   };
@@ -152,6 +142,10 @@ export type FuelRecord = {
   readBy: "manual" | "leitura_automatica";
   geo?: GeoPoint;
   alerts: FuelAlert[];
+  /** Motivo escrito pelo motorista quando ha alerta. A central aprova ou recusa. */
+  justification?: string;
+  photoPaths?: { pump?: string; receipt?: string; panel?: string };
+  reviewStatus?: "ok" | "pendente" | "aprovado" | "recusado";
   synced: boolean;
 };
 
@@ -179,7 +173,10 @@ export type ChecklistRun = {
   tripId?: string;
   at: string;
   odometer?: number;
-  answers: Record<string, { answer: ChecklistAnswer; note?: string; photo?: boolean }>;
+  answers: Record<
+    string,
+    { answer: ChecklistAnswer; note?: string; photo?: boolean; photoPath?: string }
+  >;
   approved: boolean;
   synced: boolean;
 };
@@ -202,6 +199,7 @@ export type Occurrence = {
   at: string;
   note: string;
   photo: boolean;
+  photoPaths?: string[];
   geo?: GeoPoint;
   tripId?: string;
   stopId?: string;
@@ -219,6 +217,8 @@ export type DriverDocument = {
   expiresAt: string;
   blocking: boolean;
   photo: boolean;
+  /** enviado = foto nova aguardando a central conferir */
+  status?: "valido" | "enviado" | "recusado";
 };
 
 export type Notice = {
@@ -297,4 +297,29 @@ export type DemoState = {
     trackerKmSinceLastFuel: number;
   };
   queue: QueueItem[];
+  /** Preenchido quando o app esta ligado na Frotak (tenant com os modulos da operacao). */
+  live?: LiveInfo;
+};
+
+export type ServerScore = {
+  total: number;
+  lines: {
+    key: string;
+    label: string;
+    points: number;
+    max: number;
+    why: string;
+    available: boolean;
+  }[];
+  tier: { min: number; amount: number; label: string } | null;
+  kmPerLiter: number | null;
+};
+
+export type LiveInfo = {
+  modules: string[];
+  serverTime: string;
+  loadedAt: string;
+  score?: ServerScore;
+  emergencyPhone?: string;
+  lastError?: string;
 };

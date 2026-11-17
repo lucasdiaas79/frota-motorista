@@ -106,18 +106,43 @@ export const STATIONS: FuelStation[] = [
 ];
 
 export const CHECKLIST_TEMPLATE: ChecklistItem[] = [
-  { id: "pneus", group: "Pneus e rodas", label: "Pneus calibrados, sem corte ou bolha", critical: true },
+  {
+    id: "pneus",
+    group: "Pneus e rodas",
+    label: "Pneus calibrados, sem corte ou bolha",
+    critical: true,
+  },
   { id: "estepe", group: "Pneus e rodas", label: "Estepe e porcas das rodas", critical: false },
-  { id: "freios", group: "Freios e direcao", label: "Freio de servico e de estacionamento", critical: true },
+  {
+    id: "freios",
+    group: "Freios e direcao",
+    label: "Freio de servico e de estacionamento",
+    critical: true,
+  },
   { id: "direcao", group: "Freios e direcao", label: "Direcao sem folga", critical: true },
   { id: "luzes", group: "Luzes", label: "Farois, setas, luz de freio e re", critical: true },
   { id: "painel", group: "Painel", label: "Sem luz de falha acesa no painel", critical: false },
   { id: "vazamento", group: "Motor", label: "Sem vazamento de oleo, agua ou ar", critical: true },
   { id: "oleo", group: "Motor", label: "Nivel de oleo e agua", critical: false },
-  { id: "extintor", group: "Seguranca", label: "Extintor na validade, triangulo e macaco", critical: true },
+  {
+    id: "extintor",
+    group: "Seguranca",
+    label: "Extintor na validade, triangulo e macaco",
+    critical: true,
+  },
   { id: "cinto", group: "Seguranca", label: "Cinto de seguranca e retrovisores", critical: true },
-  { id: "tacografo", group: "Documentos", label: "Tacografo funcionando e documento do veiculo", critical: true },
-  { id: "bau", group: "Carroceria", label: "Bau ou sider sem avaria, lona e travas", critical: false },
+  {
+    id: "tacografo",
+    group: "Documentos",
+    label: "Tacografo funcionando e documento do veiculo",
+    critical: true,
+  },
+  {
+    id: "bau",
+    group: "Carroceria",
+    label: "Bau ou sider sem avaria, lona e travas",
+    critical: false,
+  },
   { id: "epi", group: "Seguranca", label: "EPI: colete, bota e luva", critical: false },
   { id: "limpeza", group: "Cabine", label: "Cabine limpa e sem objeto solto", critical: false },
 ];
@@ -132,7 +157,14 @@ function distributionStops(now: number): Stop[] {
       city: "Aracaju/SE",
       geo: { lat: -10.9139, lng: -37.0565 },
       window: { from: "07:00", to: "11:00" },
-      invoices: [{ number: "NF 184.221", boxes: 48, amount: 3912.4, key: "2826 1112 3456 7800 0101 5500 1000 1842 2110 0000 0011" }],
+      invoices: [
+        {
+          number: "NF 184.221",
+          boxes: 48,
+          amount: 3912.4,
+          key: "2826 1112 3456 7800 0101 5500 1000 1842 2110 0000 0011",
+        },
+      ],
       returnablesExpected: { garrafeira: 40 },
       payment: { method: "boleto", amount: 3912.4 },
     },
@@ -255,7 +287,14 @@ function transferStops(): Stop[] {
       radiusMeters: 500,
       window: { from: "06:30", to: "07:30" },
       dock: "Doca 12",
-      invoices: [{ number: "NF 552.910", boxes: 1680, amount: 98450.0, key: "2826 1100 1122 3300 0144 5500 1000 5529 1010 0000 0099" }],
+      invoices: [
+        {
+          number: "NF 552.910",
+          boxes: 1680,
+          amount: 98450.0,
+          key: "2826 1100 1122 3300 0144 5500 1000 5529 1010 0000 0099",
+        },
+      ],
       returnablesExpected: {},
       status: "pendente",
     },
@@ -323,7 +362,11 @@ function buildTrip(kind: OperationKind, now: number): Trip {
   };
 }
 
-function fuelHistory(kind: OperationKind, now: number, tank: number): { records: FuelRecord[]; odometer: number } {
+function fuelHistory(
+  kind: OperationKind,
+  now: number,
+  tank: number,
+): { records: FuelRecord[]; odometer: number } {
   const rand = rng(kind === "distribuicao" ? 7 : 11);
   const records: FuelRecord[] = [];
   let odometer = kind === "distribuicao" ? 182_400 : 418_900;
@@ -354,7 +397,13 @@ function fuelHistory(kind: OperationKind, now: number, tank: number): { records:
       readBy: i > 7 ? "leitura_automatica" : "manual",
       alerts:
         i === 4
-          ? [{ code: "preco_acima", level: "aviso", message: "Preco R$ 0,31 acima do negociado com o posto" }]
+          ? [
+              {
+                code: "preco_acima",
+                level: "aviso",
+                message: "Preco R$ 0,31 acima do negociado com o posto",
+              },
+            ]
           : [],
       synced: true,
     });
@@ -366,11 +415,37 @@ function fuelHistory(kind: OperationKind, now: number, tank: number): { records:
 
 function telemetry(now: number): TelemetryEvent[] {
   return [
-    { id: "tel1", at: iso(now - 9 * DAY), kind: "excesso_velocidade", detail: "84 km/h na BR-235 (limite 80)" },
-    { id: "tel2", at: iso(now - 6 * DAY), kind: "motor_ocioso", detail: "Motor ligado parado no CDD", minutes: 38, justified: false },
-    { id: "tel3", at: iso(now - 6 * DAY), kind: "motor_ocioso", detail: "Fila de descarga no Supermercado Sergipano", minutes: 52, justified: true },
+    {
+      id: "tel1",
+      at: iso(now - 9 * DAY),
+      kind: "excesso_velocidade",
+      detail: "84 km/h na BR-235 (limite 80)",
+    },
+    {
+      id: "tel2",
+      at: iso(now - 6 * DAY),
+      kind: "motor_ocioso",
+      detail: "Motor ligado parado no CDD",
+      minutes: 38,
+      justified: false,
+    },
+    {
+      id: "tel3",
+      at: iso(now - 6 * DAY),
+      kind: "motor_ocioso",
+      detail: "Fila de descarga no Supermercado Sergipano",
+      minutes: 52,
+      justified: true,
+    },
     { id: "tel4", at: iso(now - 3 * DAY), kind: "frenagem_brusca", detail: "Av. Hermes Fontes" },
-    { id: "tel5", at: iso(now - 2 * DAY), kind: "motor_ocioso", detail: "Descarga no Bar do Litoral", minutes: 24, justified: true },
+    {
+      id: "tel5",
+      at: iso(now - 2 * DAY),
+      kind: "motor_ocioso",
+      detail: "Descarga no Bar do Litoral",
+      minutes: 24,
+      justified: true,
+    },
   ];
 }
 
@@ -466,7 +541,10 @@ export function createSeed(kind: OperationKind = "distribuicao"): DemoState {
     tenant: {
       id: "tenant_demo_ambev_se",
       name: "Transportes Serigy (demonstracao)",
-      operation: kind === "distribuicao" ? "Operacao Ambev SE - Distribuicao" : "Operacao Ambev SE - Transferencia",
+      operation:
+        kind === "distribuicao"
+          ? "Operacao Ambev SE - Distribuicao"
+          : "Operacao Ambev SE - Transferencia",
       shipper: "Ambev",
       city: "Aracaju/SE",
     },
@@ -501,28 +579,82 @@ export function createSeed(kind: OperationKind = "distribuicao"): DemoState {
         severity: "media",
         status: "resolvida",
         thread: [
-          { at: iso(now - 5 * DAY), from: "motorista", text: "Pneu traseiro direito murcho na Av. Tancredo Neves" },
-          { at: iso(now - 5 * DAY + 6 * MIN), from: "central", text: "Recebido. Borracheiro parceiro a caminho, previsao 25 min." },
-          { at: iso(now - 5 * DAY + 70 * MIN), from: "central", text: "Resolvido. Pode seguir a rota." },
+          {
+            at: iso(now - 5 * DAY),
+            from: "motorista",
+            text: "Pneu traseiro direito murcho na Av. Tancredo Neves",
+          },
+          {
+            at: iso(now - 5 * DAY + 6 * MIN),
+            from: "central",
+            text: "Recebido. Borracheiro parceiro a caminho, previsao 25 min.",
+          },
+          {
+            at: iso(now - 5 * DAY + 70 * MIN),
+            from: "central",
+            text: "Resolvido. Pode seguir a rota.",
+          },
         ],
         synced: true,
       },
     ],
     documents: [
-      { id: "doc1", kind: "cnh", label: "CNH categoria E", number: "0000000001", expiresAt: iso(now + 23 * DAY), blocking: true, photo: true },
-      { id: "doc2", kind: "toxicologico", label: "Exame toxicologico", expiresAt: iso(now + 410 * DAY), blocking: true, photo: true },
-      { id: "doc3", kind: "aso", label: "ASO (exame medico)", expiresAt: iso(now + 160 * DAY), blocking: true, photo: true },
-      { id: "doc4", kind: "direcao_defensiva", label: "Curso de direcao defensiva", expiresAt: iso(now - 4 * DAY), blocking: false, photo: true },
-      { id: "doc5", kind: "integracao_cliente", label: "Integracao de seguranca do cliente", expiresAt: iso(now + 75 * DAY), blocking: true, photo: false },
-      { id: "doc6", kind: "nr11", label: "NR-11 (movimentacao de carga)", expiresAt: iso(now + 290 * DAY), blocking: false, photo: true },
+      {
+        id: "doc1",
+        kind: "cnh",
+        label: "CNH categoria E",
+        number: "0000000001",
+        expiresAt: iso(now + 23 * DAY),
+        blocking: true,
+        photo: true,
+      },
+      {
+        id: "doc2",
+        kind: "toxicologico",
+        label: "Exame toxicologico",
+        expiresAt: iso(now + 410 * DAY),
+        blocking: true,
+        photo: true,
+      },
+      {
+        id: "doc3",
+        kind: "aso",
+        label: "ASO (exame medico)",
+        expiresAt: iso(now + 160 * DAY),
+        blocking: true,
+        photo: true,
+      },
+      {
+        id: "doc4",
+        kind: "direcao_defensiva",
+        label: "Curso de direcao defensiva",
+        expiresAt: iso(now - 4 * DAY),
+        blocking: false,
+        photo: true,
+      },
+      {
+        id: "doc5",
+        kind: "integracao_cliente",
+        label: "Integracao de seguranca do cliente",
+        expiresAt: iso(now + 75 * DAY),
+        blocking: true,
+        photo: false,
+      },
+      {
+        id: "doc6",
+        kind: "nr11",
+        label: "NR-11 (movimentacao de carga)",
+        expiresAt: iso(now + 290 * DAY),
+        blocking: false,
+        photo: true,
+      },
     ],
     notices: [
       {
         id: "n1",
         at: iso(now - 2 * HOUR),
         title: "DDS da semana: celular so com o caminhao parado",
-        body:
-          "Regra do cliente: e proibido mexer no celular com o veiculo em movimento. O app da Frotak trava a tela quando o caminhao anda e deixa so os botoes grandes e a voz. Pare em local seguro para registrar entregas e abastecimentos.",
+        body: "Regra do cliente: e proibido mexer no celular com o veiculo em movimento. O app da Frotak trava a tela quando o caminhao anda e deixa so os botoes grandes e a voz. Pare em local seguro para registrar entregas e abastecimentos.",
         from: "Seguranca - Transportes Serigy",
         requiresAck: true,
         tag: "seguranca",
@@ -531,8 +663,7 @@ export function createSeed(kind: OperationKind = "distribuicao"): DemoState {
         id: "n2",
         at: iso(now - 26 * HOUR),
         title: "Nova regra de vasilhame",
-        body:
-          "A partir de segunda, toda garrafeira devolvida precisa ser contada na hora da entrega, no app. A diferenca entre o esperado e o devolvido vai para o relatorio do cliente.",
+        body: "A partir de segunda, toda garrafeira devolvida precisa ser contada na hora da entrega, no app. A diferenca entre o esperado e o devolvido vai para o relatorio do cliente.",
         from: "Operacao Ambev SE",
         requiresAck: true,
         tag: "cliente",
@@ -549,10 +680,36 @@ export function createSeed(kind: OperationKind = "distribuicao"): DemoState {
       },
     ],
     schedule: [
-      { id: "sc1", date: localDate(now), label: "Hoje", detail: kind === "distribuicao" ? "Rota Aracaju Sul, 6 entregas" : "Transferencia para Itabaiana", kind: "viagem" },
-      { id: "sc2", date: localDate(now + DAY), label: "Amanha", detail: kind === "distribuicao" ? "Rota Aracaju Norte, 8 entregas" : "Transferencia para Lagarto", kind: "viagem" },
-      { id: "sc3", date: localDate(now + 2 * DAY), label: "Depois de amanha", detail: "Treinamento de direcao defensiva, 8h no CDD", kind: "treinamento" },
-      { id: "sc4", date: localDate(now + 3 * DAY), label: "Folga", detail: "Descanso semanal remunerado", kind: "folga" },
+      {
+        id: "sc1",
+        date: localDate(now),
+        label: "Hoje",
+        detail:
+          kind === "distribuicao" ? "Rota Aracaju Sul, 6 entregas" : "Transferencia para Itabaiana",
+        kind: "viagem",
+      },
+      {
+        id: "sc2",
+        date: localDate(now + DAY),
+        label: "Amanha",
+        detail:
+          kind === "distribuicao" ? "Rota Aracaju Norte, 8 entregas" : "Transferencia para Lagarto",
+        kind: "viagem",
+      },
+      {
+        id: "sc3",
+        date: localDate(now + 2 * DAY),
+        label: "Depois de amanha",
+        detail: "Treinamento de direcao defensiva, 8h no CDD",
+        kind: "treinamento",
+      },
+      {
+        id: "sc4",
+        date: localDate(now + 3 * DAY),
+        label: "Folga",
+        detail: "Descanso semanal remunerado",
+        kind: "folga",
+      },
     ],
     telemetry: telemetry(now),
     team: [
@@ -563,7 +720,12 @@ export function createSeed(kind: OperationKind = "distribuicao"): DemoState {
       { name: "Motorista D", score: 74, kmPerLiter: kind === "distribuicao" ? 3.91 : 2.49 },
       { name: "Motorista E", score: 66, kmPerLiter: kind === "distribuicao" ? 3.72 : 2.38 },
     ],
-    sim: { offline: false, moving: false, speedKmh: 0, trackerKmSinceLastFuel: kind === "distribuicao" ? 84 : 205 },
+    sim: {
+      offline: false,
+      moving: false,
+      speedKmh: 0,
+      trackerKmSinceLastFuel: kind === "distribuicao" ? 84 : 205,
+    },
     queue: [],
   };
   return state;
