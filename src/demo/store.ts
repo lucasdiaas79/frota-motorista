@@ -158,16 +158,21 @@ function commit(draft: DemoState, label: string): { draft: DemoState; synced: bo
 
 // ---------------------------------------------------------------- jornada
 
+/**
+ * Jornada atual: a que esta aberta (mesmo que tenha comecado ontem, como uma jornada que
+ * vira a meia-noite ou ficou sem encerrar), senao a de hoje.
+ */
 export function today(s: DemoState): WorkDay | undefined {
+  const open = s.workDays.filter((d) => d.startedAt && !d.endedAt);
+  if (open.length) return open[open.length - 1];
   const date = localDate(Date.now());
   return s.workDays.find((d) => d.date === date);
 }
 
 function withToday(s: DemoState, fn: (day: WorkDay) => WorkDay): DemoState {
-  const date = localDate(Date.now());
-  const existing = s.workDays.find((d) => d.date === date);
+  const existing = today(s);
   if (!existing) return s;
-  return { ...s, workDays: s.workDays.map((d) => (d.date === date ? fn(d) : d)) };
+  return { ...s, workDays: s.workDays.map((d) => (d.id === existing.id ? fn(d) : d)) };
 }
 
 export function startDay(geo?: GeoPoint, selfie = false) {
