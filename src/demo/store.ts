@@ -269,6 +269,44 @@ export function endDay(geo?: GeoPoint) {
   });
 }
 
+/** Reabre a jornada encerrada (ate 12 h depois do fim). O intervalo fica fora da jornada. */
+export const REOPEN_LIMIT_MS = 12 * 3_600_000;
+
+export function reopenDay(geo?: GeoPoint) {
+  const day = today(load());
+  if (!day?.endedAt || Date.now() - new Date(day.endedAt).getTime() > REOPEN_LIMIT_MS) return;
+  const endedAt = day.endedAt;
+  send("driver_journey_reopen", { p_geo: geo }, "Jornada reaberta");
+  set((s) => {
+    const current = today(s);
+    if (!current?.endedAt) return s;
+    const { draft, synced } = commit(s, "Jornada reaberta");
+    const at = nowIso();
+    const clock = new Date(endedAt).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return withToday(draft, (d) => {
+      const { endedAt: _ended, confirmedByDriverAt: _confirmed, ...rest } = d;
+      return {
+        ...rest,
+        segments: [
+          ...d.segments,
+          {
+            id: uid("seg"),
+            activity: "trabalho",
+            startAt: at,
+            source: "motorista",
+            reason: `Jornada reaberta (tinha encerrado as ${clock})`,
+            ...(geo ? { geo } : {}),
+            synced,
+          },
+        ],
+      };
+    });
+  });
+}
+
 export function adjustSegment(
   dayId: string,
   segmentId: string,

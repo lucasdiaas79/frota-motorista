@@ -157,6 +157,9 @@ const ERROR_TEXT: Record<string, string> = {
   CHECKLIST_TEMPLATE_NOT_FOUND: "A transportadora ainda nao cadastrou o checklist.",
   OPS_EVENT_TOO_OLD: "Registro com mais de 72 horas no celular. Fale com a central para lancar.",
   MODULE_DISABLED: "Recurso nao liberado para a sua transportadora.",
+  JOURNEY_NOTHING_TO_REOPEN: "Nenhuma jornada encerrada para reabrir.",
+  JOURNEY_ALREADY_REVIEWED: "A central ja revisou esta jornada. Peca o ajuste para a central.",
+  JOURNEY_REOPEN_TOO_LATE: "So da para reabrir ate 12 horas depois de encerrar. Inicie uma nova jornada.",
 };
 
 export function friendlyError(err: unknown) {

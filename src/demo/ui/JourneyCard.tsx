@@ -1,11 +1,30 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Coffee, Hourglass, LogIn, LogOut, Moon, PackageOpen, Play, Wrench } from "lucide-react";
+import {
+  Coffee,
+  Hourglass,
+  LogIn,
+  LogOut,
+  Moon,
+  PackageOpen,
+  Play,
+  RotateCcw,
+  Wrench,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet } from "@/components/app/Sheet";
 import { ACTIVITY_HINT, ACTIVITY_LABEL, RULES, fmtClock, fmtMin, summarize } from "../jornada";
-import { endDay, getState, setActivity, startDay, today, useDemo } from "../store";
+import {
+  REOPEN_LIMIT_MS,
+  endDay,
+  getState,
+  reopenDay,
+  setActivity,
+  startDay,
+  today,
+  useDemo,
+} from "../store";
 import { captureGeo } from "../geo";
 import type { Activity } from "../types";
 import { BigButton, Pill, ProgressRing, Toggle, useNow, type Tone } from "./kit";
@@ -46,9 +65,13 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
   const summary = summarize(day, prevEnd, now);
   const [startOpen, setStartOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
   const [selfie, setSelfie] = useState(true);
   const started = Boolean(day?.startedAt && !day.endedAt);
   const ended = Boolean(day?.endedAt);
+  const canReopen = Boolean(
+    day?.endedAt && now - new Date(day.endedAt).getTime() <= REOPEN_LIMIT_MS,
+  );
   const Icon = ACTIVITY_ICON[summary.current];
   const drivingRatio = summary.continuousDrivingMin / RULES.maxContinuousDrivingMin;
   const ringTone: Tone =
@@ -141,6 +164,21 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
         </div>
       ) : null}
 
+      {ended && canReopen ? (
+        <div className="mt-3">
+          <p className="text-[13px] text-muted-foreground">
+            Encerrou sem querer ou precisa voltar ao trabalho? Reabra a jornada. O tempo parado
+            fica fora da jornada.
+          </p>
+          <button
+            onClick={() => setReopenOpen(true)}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-[13px] font-extrabold"
+          >
+            <RotateCcw className="h-4 w-4" /> Reabrir jornada
+          </button>
+        </div>
+      ) : null}
+
       {started && !compact ? (
         <>
           <p className="mt-4 label-xs">Trocar atividade</p>
@@ -201,6 +239,29 @@ export function JourneyCard({ compact = false }: { compact?: boolean }) {
             }}
           >
             Confirmar inicio agora
+          </BigButton>
+        </div>
+      </Sheet>
+
+      <Sheet open={reopenOpen} onClose={() => setReopenOpen(false)} title="Reabrir jornada">
+        <div className="space-y-3">
+          <p className="text-[14px] text-muted-foreground">
+            A jornada encerrada as {fmtClock(day?.endedAt)} volta a contar a partir de agora. O
+            intervalo entre o fim e agora fica fora da jornada. A central ve a reabertura no
+            espelho de ponto.
+          </p>
+          <BigButton
+            icon={<RotateCcw className="h-5 w-5" />}
+            onClick={async () => {
+              const geo = await captureGeo(CDD.geo);
+              reopenDay(geo);
+              setReopenOpen(false);
+              toast.success("Jornada reaberta", {
+                description: `${fmtClock(new Date().toISOString())} - posicao registrada`,
+              });
+            }}
+          >
+            Confirmar reabertura
           </BigButton>
         </div>
       </Sheet>
