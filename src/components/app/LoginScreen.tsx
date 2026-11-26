@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Eye, EyeOff, LockKeyhole, Phone, Truck } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,13 @@ export function LoginScreen({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Link enviado pela central: ?telefone=79999999999 so preenche o campo de login.
+  useEffect(() => {
+    const telefone = new URLSearchParams(window.location.search).get("telefone");
+    const digits = telefone?.replace(/\D/g, "") ?? "";
+    if (digits) setPhone((current) => current || digits);
+  }, []);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
